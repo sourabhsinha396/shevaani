@@ -1,0 +1,259 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Tokens follow the shadcn contract so `npx shadcn add <component>` drops in
+   without any edits.
+
+   The palette is a neutral grey ramp with exactly one saturated colour in it —
+   `--brand`. Nothing else in the system is allowed to be colourful, which is
+   what makes a single lime button read as *the* action on a page. Semantic
+   states (success/warning/destructive) are the only exceptions, and they are
+   deliberately desaturated so they never compete with brand.
+
+   `--surface-subtle` is the second background. Sections alternate between it
+   and `--background` to give the page rhythm without drawing any boxes. */
+:root {
+  --radius: 0.625rem;
+
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --surface-subtle: #f0f6fa;
+
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+
+  --brand: #d4f268;
+  --brand-foreground: #0a0a0a;
+  /* Brand as *ink*. The lime is a fill colour — as text or an icon on white it
+     fails contrast outright, so anything drawn in brand rather than filled with
+     it uses this darker olive instead. In dark mode the two collapse into one. */
+  --brand-ink: #6f8c17;
+
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+
+  --destructive: #e40014;
+  --destructive-foreground: #fafafa;
+  --success: #127a44;
+  --warning: #96650a;
+
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #a1a1a1;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --surface-subtle: #111417;
+
+  --card: #171717;
+  --card-foreground: #fafafa;
+  --popover: #171717;
+  --popover-foreground: #fafafa;
+
+  --primary: #e5e5e5;
+  --primary-foreground: #171717;
+
+  --brand: #d4f268;
+  --brand-foreground: #0a0a0a;
+  --brand-ink: var(--brand);
+
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #262626;
+  --muted-foreground: #a1a1a1;
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+
+  --destructive: #ff6568;
+  --destructive-foreground: #0a0a0a;
+  --success: #67d391;
+  --warning: #e8bb52;
+
+  /* Translucent rather than solid, so borders sit on whatever surface is
+     underneath instead of forming a visible grid of grey lines. */
+  --border: rgb(255 255 255 / 0.1);
+  --input: rgb(255 255 255 / 0.15);
+  --ring: #737373;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-ink: var(--brand-ink);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Two families, one job each: a serif for display headings, a grotesk for
+     everything you actually read. Both are wired up in app/layout.tsx. */
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-playfair), ui-serif, Georgia, serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Scale only. Centring is left to Tailwind's `-translate-1/2`, which in v4
+     sets the standalone `translate` property — so the two never fight, and the
+     rings stay centred when reduced-motion drops the animation entirely. */
+  --animate-ripple: ripple 3.4s ease infinite;
+  --animate-rise: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes ripple {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    50% {
+      transform: scale(0.92);
+      opacity: 0.9;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shine {
+    0% {
+      transform: translateX(-120%) skewX(-20deg);
+    }
+    100% {
+      transform: translateX(220%) skewX(-20deg);
+    }
+  }
+
+  --animate-shiny-text: shiny-text 8s infinite;
+
+  @keyframes shiny-text {
+    0%,
+    90%,
+    100% {
+      background-position: calc(-100% - var(--shiny-width)) 0;
+    }
+    30%,
+    60% {
+      background-position: calc(100% + var(--shiny-width)) 0;
+    }
+  }
+
+  /* Marquee tracks. Two copies of the children scroll one full width, so the
+     seam lands exactly where the first copy ends and reads as continuous. */
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(-100%);
+    }
+  }
+
+  /* The speaking-level bars in the session preview. Each bar carries its own
+     `--i` so the row reads as one voice rather than a synchronised equaliser. */
+  @keyframes speak {
+    0%,
+    100% {
+      transform: scaleY(0.35);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+
+  /* The live dot next to "in session now". */
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+    70%,
+    100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+  /* Display headings are serif at *normal* weight. A bold serif at this size
+     reads as a newspaper masthead; a regular one reads as considered. */
+  h1,
+  h2 {
+    font-family: var(--font-heading);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  /* The eyebrow above a section heading. Small, wide-tracked, uppercase — it
+     labels the section without competing with the heading for size. */
+  .eyebrow {
+    @apply text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase;
+  }
+
+  /* Sections are full-bleed and separated by a hairline, not by whitespace
+     alone. Alternate with `bg-surface-subtle` down the page. */
+  .section {
+    @apply border-border/60 border-b py-24 md:py-32;
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4;
+  }
+}

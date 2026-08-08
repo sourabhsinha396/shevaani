@@ -1,0 +1,70 @@
+name: shevaani
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shevaani
+      POSTGRES_PASSWORD: shevaani
+      POSTGRES_DB: shevaani
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shevaani -d shevaani"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build: .
+    env_file: .env
+    environment:
+      # Inside the network these resolve to the service names, not localhost.
+      DATABASE_URL: postgresql+asyncpg://shevaani:shevaani@db:5432/shevaani
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Bind-mount for hot reload. Drop this in production.
+      - .:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://shevaani:shevaani@db:5432/shevaani
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      # Waits for `web` so migrations have run before jobs touch the tables.
+      web:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: arq app.workers.settings.WorkerSettings
+
+# The Next.js frontend is not containerised — run it natively:
+#   cd ../frontend && npm run dev
+# It calls this API on http://localhost:8000.
+
+volumes:
+  pgdata:
