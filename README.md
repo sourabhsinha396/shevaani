@@ -5,7 +5,7 @@ sessions, on one scheduling engine.
 
 - **Backend** — FastAPI, SQLAlchemy 2.0 async, Postgres, Redis, ARQ. Runs in Docker.
 - **Frontend** — Next.js App Router, Tailwind v4, shadcn/ui. Runs natively.
-- **Video** — Google Meet, minted via the Calendar API on the facilitator's own account.
+- **Video** — Google Meet, minted via the Calendar API on the instructor's own account.
 - **Payments** — Stripe (global) and Razorpay (India), behind one provider protocol.
 
 Design decisions and the reasoning behind them: [docs/PLAN.md](docs/PLAN.md).
@@ -44,7 +44,7 @@ Emails are validated the same way the API validates them, so reserved domains
 like `.local` are rejected. Use a real domain (`admin@shevaani.com`), or you'll
 create an account that can never sign in.
 
-A `Makefile` wraps the rest: `make logs`, `make psql`, `make facilitator`,
+A `Makefile` wraps the rest: `make logs`, `make psql`, `make instructor`,
 `make credits email=you@example.com n=10`, `make revision m="…"`.
 
 ### Adding more UI components
@@ -74,7 +74,7 @@ each one keeps **an hour clear either side**. Both are configurable via
 constraint, so changing it needs a migration (see
 `alembic/versions/0001_initial_schema.py`).
 
-**Facilitators block their own time** at `/facilitator`. Blocked ranges are
+**Instructors block their own time** at `/facilitator`. Blocked ranges are
 removed from slot generation immediately. Creating a block over an already-booked
 session is refused, naming the session in the way — cancelling someone's class as
 a side effect of "I'm busy Tuesday" is not a decision this code makes on its own.
@@ -83,13 +83,13 @@ a side effect of "I'm busy Tuesday" is not a decision this code makes on its own
 
 The Meet REST API requires Google Workspace, which we don't use, so links are
 minted as a side effect of creating a Calendar event
-(`conferenceData.createRequest`) on the **facilitator's own** Google account.
+(`conferenceData.createRequest`) on the **instructor's own** Google account.
 That is what makes them the actual meeting host — able to admit people from the
-lobby, mute, and remove. Each facilitator connects their account once at
+lobby, mute, and remove. Each instructor connects their account once at
 `/facilitator`.
 
 Learners are not added as calendar guests (consumer accounts have
-guest-invitation limits), so they will land in the Meet lobby and the facilitator
+guest-invitation limits), so they will land in the Meet lobby and the instructor
 admits them. Join early.
 
 Google is never called from the request path. Sessions commit first, then a
@@ -106,7 +106,7 @@ Exercised end to end against a live stack on 4 Aug 2026:
 - one-to-one slot generation respects the 07:00–19:00 IST window
 - booking an 11:00 slot removes 10:00, 11:00 and 12:00 — the one-hour buffer
 - booking outside the window is refused, including a session that *ends* past 19:00
-- facilitator blocking removes slots; blocking over a booked session is refused
+- instructor blocking removes slots; blocking over a booked session is refused
   and names the session in the way
 - a learner cannot book two overlapping sessions (caught by the DB constraint),
   nor the same session twice
@@ -114,7 +114,7 @@ Exercised end to end against a live stack on 4 Aug 2026:
   the next person in line
 - the join endpoint refuses non-enrolled users and out-of-window requests, and
   audits both
-- the Meet worker fails visibly and non-retryably when a facilitator has no
+- the Meet worker fails visibly and non-retryably when an instructor has no
   Google connection, leaving the booking intact
 
 Not exercised: the actual Google Calendar call (needs OAuth credentials),

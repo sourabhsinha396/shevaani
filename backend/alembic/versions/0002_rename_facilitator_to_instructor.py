@@ -21,6 +21,15 @@ Two things are worth knowing before reading it:
 
 The exclusion constraints from 0001 reference the renamed column, but Postgres
 rewrites those references itself; only the constraint *names* need touching.
+
+One name is not a straight substitution. 0001 passed an already-prefixed name
+to its CheckConstraint, which the ``ck_%(table_name)s_%(constraint_name)s``
+naming convention then prefixed again, so the live database holds
+``ck_facilitator_blocks_ck_facilitator_blocks_ends_after_starts``. Since we are
+renaming it anyway, it lands on the single-prefixed name the model's metadata
+actually generates — otherwise every future autogenerate would propose
+"fixing" it. The downgrade restores the doubled name, so it remains a true
+inverse.
 """
 
 from __future__ import annotations
@@ -35,8 +44,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-#: (old, new) for everything that carries the word. Indexes and constraints are
-#: split out because they need different DDL.
+#: (old, new) for everything that carries the word. Only *standalone* indexes
+#: belong here — ``pk_`` and ``ex_`` are backed by indexes of the same name, and
+#: renaming the constraint renames its index too.
 INDEXES = [
     ("ix_sessions_facilitator_id", "ix_sessions_instructor_id"),
     ("ix_facilitator_blocks_facilitator_id", "ix_instructor_blocks_instructor_id"),
@@ -64,9 +74,10 @@ TABLE_CONSTRAINTS = [
         "fk_facilitator_blocks_created_by_id_users",
         "fk_instructor_blocks_created_by_id_users",
     ),
+    # Doubled prefix on the way in, single on the way out — see the note above.
     (
         "instructor_blocks",
-        "ck_facilitator_blocks_ends_after_starts",
+        "ck_facilitator_blocks_ck_facilitator_blocks_ends_after_starts",
         "ck_instructor_blocks_ends_after_starts",
     ),
     (
