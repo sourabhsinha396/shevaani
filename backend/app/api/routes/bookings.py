@@ -3,12 +3,14 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
+from app.api.ratelimit import limiter
 from app.api.serializers import build_session_out, seat_counts
+from app.core.ratelimit import BOOKING
 from app.models.billing import CreditLedger
 from app.models.booking import Booking
 from app.models.enums import BookingStatus
@@ -69,7 +71,12 @@ async def my_bookings(
     ]
 
 
-@router.post("/one-on-one", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/one-on-one",
+    response_model=BookingOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limiter("book", BOOKING))],
+)
 async def book_one_on_one(
     payload: OneOnOneBookIn,
     db: DbSession,

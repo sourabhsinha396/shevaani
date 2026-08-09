@@ -11,6 +11,7 @@ from app.core.db import get_db
 from app.core.security import ACCESS_TOKEN, decode_token
 from app.models.enums import UserRole
 from app.models.user import User
+from app.services import passwords
 
 ACCESS_COOKIE = "shevaani_access"
 REFRESH_COOKIE = "shevaani_refresh"
@@ -20,6 +21,20 @@ def _extract_token(cookie_value: str | None, authorization: str | None) -> str |
     if authorization and authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
     return cookie_value
+
+
+def token_predates_password_change(payload: dict, user: User) -> bool:
+    """A password change signs every other browser out.
+
+    Sessions are stateless JWTs with nothing to revoke, so the check is on the
+    way in: anything issued before the last password change is refused. See
+    ``services.passwords.token_cutoff`` for why this is a strict ``<``.
+    """
+    cutoff = passwords.token_cutoff(user)
+    if cutoff is None:
+        return False
+    issued_at = payload.get("iat")
+    return issued_at is None or int(issued_at) < cutoff
 
 
 async def get_current_user(
@@ -39,6 +54,10 @@ async def get_current_user(
     user = await db.get(User, uuid.UUID(payload["sub"]))
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account not available")
+    if token_predates_password_change(payload, user):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Your password changed. Please sign in again."
+        )
     return user
 
 
@@ -55,7 +74,9 @@ async def get_optional_user(
     except jwt.PyJWTError:
         return None
     user = await db.get(User, uuid.UUID(payload["sub"]))
-    return user if user and user.is_active else None
+    if user is None or not user.is_active or token_predates_password_change(payload, user):
+        return None
+    return user
 
 
 def require_role(*roles: UserRole):

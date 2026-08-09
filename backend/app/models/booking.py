@@ -61,6 +61,9 @@ class Booking(Base, UUIDPrimaryKey, Timestamped):
     session: Mapped[Session] = relationship(back_populates="bookings")
     learner: Mapped[User] = relationship(foreign_keys=[learner_id])
 
+    def __str__(self) -> str:
+        return f"{self.status.value} · {self.starts_at:%d %b %H:%M} UTC"
+
 
 class JoinAccessLog(Base, UUIDPrimaryKey):
     """Every hit on the gated join endpoint. The join URL is a bearer credential,

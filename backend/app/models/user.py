@@ -35,6 +35,16 @@ class User(Base, UUIDPrimaryKey, Timestamped):
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    #: When the learner proved they can read this address. Advisory: nothing is
+    #: blocked while it is NULL — it decides whether we trust the address enough
+    #: to send reminders to it, and whether the dashboard nags.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    #: Set on every password change. Access and refresh tokens issued before this
+    #: are refused, which is what makes a reset log the other browsers out —
+    #: the tokens are stateless JWTs and there is nothing else to revoke.
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Instructor-only
     bio: Mapped[str | None] = mapped_column(Text)
     headline: Mapped[str | None] = mapped_column(String(200))
@@ -42,6 +52,11 @@ class User(Base, UUIDPrimaryKey, Timestamped):
     google_credential: Mapped[GoogleCredential | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
+
+    def __str__(self) -> str:
+        # What the data-plane admin prints for a related row. Without it the
+        # link text is `<app.models.user.User object at 0x…>`.
+        return f"{self.full_name} <{self.email}>"
 
     @property
     def can_host(self) -> bool:

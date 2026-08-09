@@ -31,7 +31,7 @@ from app.models.enums import (
 )
 from app.models.session import Session
 from app.models.user import User
-from app.services import credits, scheduling
+from app.services import credits, notifications, scheduling
 from app.services.errors import Conflict, NotFound, SchedulingError, SessionFull
 from app.services.scheduling import utc_now
 
@@ -241,6 +241,7 @@ async def cancel_booking(
     await credits.lock_user(db, booking.learner_id)
 
     refund = booking.credits_spent > 0 and (force_refund or _refund_due(session))
+    refunded = booking.credits_spent if refund else 0
 
     booking.status = BookingStatus.CANCELLED
     booking.cancelled_at = utc_now()
@@ -258,9 +259,49 @@ async def cancel_booking(
         )
     await db.flush()
 
+    await notifications.booking_cancelled(db, booking, credits_refunded=refunded)
+
     if session.kind == SessionKind.GROUP and session.status == SessionStatus.PUBLISHED:
-        await promote_from_waitlist(db, session)
+        promoted = await promote_from_waitlist(db, session)
+        await notifications.waitlist_promoted(db, session, promoted)
     return booking
+
+
+async def record_attendance(db: AsyncSession, booking: Booking, *, attended: bool) -> Booking:
+    """Instructor-confirmed attendance.
+
+    `conferenceRecords` is Workspace-only (PLAN decision 7), so join-clicks are
+    the automatic signal and this is the authoritative correction. A cancelled
+    booking is never resurrected by it — someone who cancelled and then had the
+    session marked "attended" would look like they spent a credit they got back.
+    """
+    if booking.status == BookingStatus.CANCELLED:
+        raise Conflict("That booking was cancelled — attendance can't be recorded for it.")
+    booking.status = BookingStatus.ATTENDED if attended else BookingStatus.NO_SHOW
+    booking.attendance_confirmed_at = utc_now()
+    await db.flush()
+    return booking
+
+
+async def cancellation_impact(db: AsyncSession, session: Session) -> dict[str, int]:
+    """What cancelling this session would cost, for the confirm dialog.
+
+    Session cancellation refunds every live booking regardless of the usual
+    cutoff, so this is exactly the sum of what has been spent on it.
+    """
+    result = await db.execute(
+        select(Booking).where(
+            Booking.session_id == session.id,
+            Booking.status.in_([*SEAT_HOLDING_STATUSES, BookingStatus.WAITLISTED]),
+        )
+    )
+    affected = list(result.scalars().all())
+    return {
+        "bookings_affected": len(affected),
+        "learners_refunded": sum(1 for b in affected if b.credits_spent > 0),
+        "credits_refunded": sum(b.credits_spent for b in affected),
+        "waitlisted": sum(1 for b in affected if b.status == BookingStatus.WAITLISTED),
+    }
 
 
 async def promote_from_waitlist(db: AsyncSession, session: Session) -> list[Booking]:
@@ -317,8 +358,15 @@ async def cancel_session(
     session: Session,
     *,
     reason: str,
+    automatic: bool = False,
 ) -> list[Booking]:
-    """Cancel a session and refund every live booking regardless of the cutoff."""
+    """Cancel a session and refund every live booking regardless of the cutoff.
+
+    ``automatic`` distinguishes the T-2h under-filled sweep from a superuser
+    deciding to pull a session. Both refund identically; they read completely
+    differently to the learner, and telling someone "not enough people booked"
+    when a human cancelled it is a small lie that costs trust.
+    """
     session.status = SessionStatus.CANCELLED
     session.cancelled_at = utc_now()
     session.cancellation_reason = reason
@@ -348,6 +396,13 @@ async def cancel_session(
         booking.waitlist_position = None
 
     await db.flush()
+
+    # Dispatched after the rows are settled, and given `affected` rather than a
+    # fresh query — those bookings are CANCELLED now, so re-reading them would
+    # find nobody to write to.
+    await notifications.session_cancelled(
+        db, session, affected, automatic=automatic, reason=reason
+    )
     return affected
 
 

@@ -18,6 +18,9 @@ class UserOut(ORMModel):
     full_name: str
     role: UserRole
     timezone: str
+    #: Null means unconfirmed. Advisory — nothing is blocked by it; the frontend
+    #: uses it to offer a resend.
+    email_verified_at: datetime | None = None
     level: CEFRLevel | None = None
     headline: str | None = None
     bio: str | None = None

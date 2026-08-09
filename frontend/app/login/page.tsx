@@ -55,6 +55,13 @@ function LoginForm() {
         />
       </Field>
 
+      <Link
+        href="/forgot-password"
+        className="text-muted-foreground hover:text-foreground -mt-1 self-start text-sm underline-offset-4 hover:underline"
+      >
+        Forgot your password?
+      </Link>
+
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       <Button type="submit" variant="brand" size="lg" disabled={busy}>

@@ -4,13 +4,15 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
+from app.api.ratelimit import limiter
 from app.api.serializers import serialize_sessions
 from app.core.config import settings
+from app.core.ratelimit import BOOKING, JOIN, JOIN_PER_IP
 from app.models.booking import Booking, JoinAccessLog
 from app.models.enums import (
     BookingStatus,
@@ -82,7 +84,12 @@ async def get_session(session_id: uuid.UUID, db: DbSession, user: OptionalUser) 
     return out[0]
 
 
-@router.post("/{session_id}/book", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{session_id}/book",
+    response_model=BookingOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limiter("book", BOOKING))],
+)
 async def book_session(
     session_id: uuid.UUID,
     db: DbSession,
@@ -100,7 +107,14 @@ async def book_session(
     return BookingOut.model_validate(booking)
 
 
-@router.get("/{session_id}/join", response_model=JoinOut)
+@router.get(
+    "/{session_id}/join",
+    response_model=JoinOut,
+    # Two buckets. The per-user one is the real limit; the per-IP one is what
+    # stops someone with a handful of accounts spreading enumeration across them
+    # and staying under it.
+    dependencies=[Depends(limiter("join", JOIN, per_ip=JOIN_PER_IP))],
+)
 async def join_session(
     session_id: uuid.UUID,
     request: Request,

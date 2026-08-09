@@ -33,7 +33,7 @@ const COLUMNS = [
     },
     {
       quote:
-        "My facilitator noticed I had gone quiet for ten minutes and asked me a question directly. No class has ever done that.",
+        "My instructor noticed I had gone quiet for ten minutes and asked me a question directly. No class has ever done that.",
       name: "Fatima E.",
       detail: "Casablanca · B2",
     },

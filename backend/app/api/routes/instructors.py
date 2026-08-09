@@ -8,17 +8,27 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, Instructor
+from app.api.serializers import (
+    build_session_admin_out,
+    seat_counts,
+    session_roster,
+    waitlist_counts,
+)
 from app.core.config import settings
 from app.core.security import encrypt_secret
 from app.integrations import google_calendar
 from app.integrations.google_calendar import GoogleAPIError
 from app.models.availability import InstructorBlock
+from app.models.booking import Booking
 from app.models.enums import UserRole
+from app.models.session import Session
 from app.models.user import GoogleCredential, User
 from app.schemas.common import InstructorOut, Message, SlotOut
-from app.schemas.session import BlockIn, BlockOut
+from app.schemas.session import BlockIn, BlockOut, SessionAdminOut
+from app.services import booking as booking_service
 from app.services import scheduling, session_admin
 from app.services.errors import NotFound, PermissionDenied
 from app.services.scheduling import utc_now
@@ -60,6 +70,73 @@ async def one_on_one_slots(
         db, instructor_id, on_date, duration_minutes=duration_minutes
     )
     return [SlotOut(starts_at=s.starts_at, ends_at=s.ends_at) for s in slots]
+
+
+# ----------------------------------------------------- the instructor's own work
+#
+# The frontend gives instructors and superusers the same `/admin` shell, so the
+# boundary that matters is here: these endpoints filter by the caller's own id
+# and never accept an instructor id from the client.
+
+
+@router.get("/me/sessions", response_model=list[SessionAdminOut])
+async def my_sessions(
+    db: DbSession,
+    user: Instructor,
+    starts_after: Annotated[datetime | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> list[SessionAdminOut]:
+    conditions = [Session.instructor_id == user.id]
+    if starts_after is not None:
+        conditions.append(Session.starts_at >= starts_after)
+
+    result = await db.execute(
+        select(Session)
+        .options(selectinload(Session.instructor), selectinload(Session.meeting))
+        .where(*conditions)
+        .order_by(Session.starts_at.desc())
+        .limit(limit)
+    )
+    sessions = list(result.scalars().all())
+
+    ids = [s.id for s in sessions]
+    taken = await seat_counts(db, ids)
+    waiting = await waitlist_counts(db, ids)
+    return [
+        build_session_admin_out(s, taken=taken.get(s.id, 0), waitlisted=waiting.get(s.id, 0))
+        for s in sessions
+    ]
+
+
+async def _own_session(db: DbSession, session_id: uuid.UUID, user: User) -> Session:
+    session = await db.get(Session, session_id)
+    if session is None:
+        raise NotFound("Session not found.")
+    if session.instructor_id != user.id and user.role != UserRole.SUPERUSER:
+        raise PermissionDenied("That isn't one of your sessions.")
+    return session
+
+
+@router.get("/me/sessions/{session_id}/roster")
+async def my_session_roster(session_id: uuid.UUID, db: DbSession, user: Instructor) -> dict:
+    await _own_session(db, session_id, user)
+    return await session_roster(db, session_id, include_emails=False)
+
+
+@router.post("/me/bookings/{booking_id}/attendance", response_model=Message)
+async def confirm_attendance(
+    booking_id: uuid.UUID,
+    db: DbSession,
+    user: Instructor,
+    attended: Annotated[bool, Query()] = True,
+) -> Message:
+    """The instructor is the correction mechanism for attendance (decision 7)."""
+    booking = await db.get(Booking, booking_id)
+    if booking is None:
+        raise NotFound("Booking not found.")
+    await _own_session(db, booking.session_id, user)
+    await booking_service.record_attendance(db, booking, attended=attended)
+    return Message(detail="Attendance recorded.")
 
 
 # ------------------------------------------------------------- time blocking
@@ -136,9 +213,19 @@ async def delete_block(
 
 @router.get("/google/connect")
 async def google_connect(user: Instructor) -> RedirectResponse:
-    if not settings.google_client_id:
+    if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, "Google integration is not configured."
+        )
+    # Checked here rather than at the callback. Without a key we cannot encrypt
+    # the refresh token, and the failure would otherwise land *after* the
+    # instructor has authorised — a grant issued by Google that we then throw
+    # away, leaving them to revoke it by hand before they can try again.
+    if not settings.token_encryption_key:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "TOKEN_ENCRYPTION_KEY is not set, so a Google refresh token cannot be "
+            "stored safely. Connecting is disabled until it is configured.",
         )
     # `state` carries the user id and a nonce; it is verified on the callback.
     state = f"{user.id}:{secrets.token_urlsafe(16)}"

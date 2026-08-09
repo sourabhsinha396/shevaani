@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -237,7 +238,24 @@ async def publish_session(db: AsyncSession, session: Session) -> Session:
     return session
 
 
-async def auto_cancel_underfilled(db: AsyncSession, *, now: datetime | None = None) -> list[Session]:
+@dataclass(frozen=True)
+class AutoCancellation:
+    """What the sweep did to one session.
+
+    The counts are captured *before* the cancellation, because afterwards there
+    is nothing left to count — every booking is CANCELLED and ``seats_taken``
+    honestly returns zero. Anything reporting on this run (the worker log, the
+    Slack line) needs the before picture.
+    """
+
+    session: Session
+    seats_taken: int
+    learners_affected: int
+
+
+async def auto_cancel_underfilled(
+    db: AsyncSession, *, now: datetime | None = None
+) -> list[AutoCancellation]:
     """Cancel group sessions that won't reach ``min_seats`` in time, and refund.
 
     Without this you either run one-person "group discussions" or cancel them by
@@ -254,17 +272,22 @@ async def auto_cancel_underfilled(db: AsyncSession, *, now: datetime | None = No
             Session.starts_at <= horizon,
         )
     )
-    cancelled: list[Session] = []
+    cancelled: list[AutoCancellation] = []
     for session in result.scalars().all():
         taken = await booking_service.seats_taken(db, session.id)
         if taken >= session.min_seats:
             continue
-        await booking_service.cancel_session(
+        affected = await booking_service.cancel_session(
             db,
             session,
             reason=f"Not enough learners joined ({taken} of {session.min_seats} needed).",
+            automatic=True,
         )
-        cancelled.append(session)
+        cancelled.append(
+            AutoCancellation(
+                session=session, seats_taken=taken, learners_affected=len(affected)
+            )
+        )
     return cancelled
 
 

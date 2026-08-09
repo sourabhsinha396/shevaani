@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -20,8 +20,9 @@ const COUNTRIES = [
   { code: "DE", label: "Germany" },
 ];
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const params = useSearchParams();
   const { refresh } = useAuth();
 
   const [form, setForm] = React.useState({
@@ -47,7 +48,9 @@ export default function RegisterPage() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       await refresh();
-      router.push("/discussions");
+      // Someone who came here from a pack on the pricing page is trying to buy,
+      // not to browse — put them back where they were going.
+      router.push(params.get("next") ?? "/discussions");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -111,5 +114,14 @@ export default function RegisterPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  // `?next=` is read with useSearchParams, which needs a boundary above it.
+  return (
+    <React.Suspense fallback={null}>
+      <RegisterForm />
+    </React.Suspense>
   );
 }

@@ -24,7 +24,8 @@ cd frontend && npm run dev
 ```
 
 - Web — http://localhost:3000
-- API docs — http://localhost:8000/docs
+- API docs — http://localhost:8000/docs (**local only** — off in every deployed
+  environment, and superuser-gated if switched back on with `EXPOSE_API_DOCS`)
 
 Migrations run automatically on `web` startup. `backend/.env` already exists with
 generated secrets; if you ever recreate it from `.env.example`, regenerate
@@ -46,6 +47,21 @@ create an account that can never sign in.
 
 A `Makefile` wraps the rest: `make logs`, `make psql`, `make instructor`,
 `make credits email=you@example.com n=10`, `make revision m="…"`.
+
+## Two things called "admin"
+
+They are different tools for different jobs; the names are worth learning once.
+
+| | What it is | Who |
+|---|---|---|
+| **http://localhost:3000/admin** | The operational surface. Create and edit discussions, publish, reschedule, cancel (with the refund consequence shown first), retry a failed Meet, look a learner up, grant credits, read contact messages. | Superusers. Instructors get the same shell scoped to their own sessions and attendance. |
+| **http://localhost:8000/admin** | sqladmin — the raw data plane. Every table, with drill-down: a session leads to its bookings and its Meet, an instructor to their sessions and blocks. | Superusers only, behind its own login. |
+
+The data plane is read-only wherever the schema demands it: `credit_ledger` is
+append-only (balance is `SUM(delta)`), `payments` and `webhook_events` are
+reconciliation records, and `sessions.starts_at` cannot be edited there at all —
+`bookings` carries a denormalised copy for the learner-overlap constraint, so a
+reschedule has to move both in one transaction. Use the frontend admin for that.
 
 ### Adding more UI components
 
@@ -74,7 +90,7 @@ each one keeps **an hour clear either side**. Both are configurable via
 constraint, so changing it needs a migration (see
 `alembic/versions/0001_initial_schema.py`).
 
-**Instructors block their own time** at `/facilitator`. Blocked ranges are
+**Instructors block their own time** at `/instructor`. Blocked ranges are
 removed from slot generation immediately. Creating a block over an already-booked
 session is refused, naming the session in the way — cancelling someone's class as
 a side effect of "I'm busy Tuesday" is not a decision this code makes on its own.
@@ -86,7 +102,7 @@ minted as a side effect of creating a Calendar event
 (`conferenceData.createRequest`) on the **instructor's own** Google account.
 That is what makes them the actual meeting host — able to admit people from the
 lobby, mute, and remove. Each instructor connects their account once at
-`/facilitator`.
+`/instructor`.
 
 Learners are not added as calendar guests (consumer accounts have
 guest-invitation limits), so they will land in the Meet lobby and the instructor
@@ -117,11 +133,33 @@ Exercised end to end against a live stack on 4 Aug 2026:
 - the Meet worker fails visibly and non-retryably when an instructor has no
   Google connection, leaving the booking intact
 
-Not exercised: the actual Google Calendar call (needs OAuth credentials),
-payments (adapters are stubs), and email.
+Exercised on 8 Aug 2026, alongside the operational work below:
+
+- login is throttled at 10/minute and answers 429 with `Retry-After`
+- both webhook endpoints reject an unsigned body, and Razorpay signature
+  verification accepts a correct HMAC while rejecting a wrong one *and* a body
+  mutated by one byte
+- `pg_dump --format=custom --no-owner --no-privileges` and the matching
+  `pg_restore --clean --if-exists` round-trip the live database into a throwaway
+  one, exclusion constraints and all
+- backup key naming, retention pruning (never the newest) and the filesystem
+  storage fallback
+- `robots.txt`, `sitemap.xml`, per-session canonical URLs and `Event`
+  structured data, with no join URL anywhere in the rendered markup
+
+Not exercised: the actual Google Calendar call, and live Stripe/Razorpay
+payments. Both need real credentials — see
+[docs/GOOGLE_MEET.md](docs/GOOGLE_MEET.md) for the Google runbook.
+
+## Operations
+
+- [docs/BACKUPS.md](docs/BACKUPS.md) — nightly dumps, retention, and
+  `make restore-drill`, which is the actual deliverable of that work.
+- [docs/GOOGLE_MEET.md](docs/GOOGLE_MEET.md) — Cloud project setup, the OAuth
+  verification decision (an unverified app caps refresh tokens at seven days),
+  and the live end-to-end check.
 
 ## Not done yet
 
-Reminder emails, the Stripe and Razorpay adapters (the protocol and tables exist,
-the implementations are stubs), recurring session series, and reviews. Tracked at
-the bottom of [docs/PLAN.md](docs/PLAN.md).
+Recurring session series, reviews, and learner progress. Tracked at the bottom of
+[docs/PLAN.md](docs/PLAN.md).

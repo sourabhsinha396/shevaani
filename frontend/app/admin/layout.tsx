@@ -8,26 +8,50 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { cn } from "@/lib/utils";
 
-const TABS = [
+/**
+ * One shell, two roles.
+ *
+ * Superusers run the platform; instructors see their own work and nothing else.
+ * The tabs below differ by role, but that is presentation only — every endpoint
+ * behind them re-checks the caller, and the instructor endpoints derive the
+ * instructor from the session rather than from anything the client sends. Hiding
+ * a tab is not a security boundary and is not treated as one.
+ */
+const SUPERUSER_TABS = [
   { href: "/admin", label: "Sessions" },
   { href: "/admin/new", label: "New discussion" },
-  { href: "/admin/facilitators", label: "Facilitators" },
+  { href: "/admin/learners", label: "Learners" },
+  { href: "/admin/instructors", label: "Instructors" },
+  { href: "/admin/messages", label: "Messages" },
 ];
 
-/**
- * Client-side gate for UX only. Every admin endpoint re-checks the role on the
- * server — this just avoids rendering a screen the user can't use.
- */
+const INSTRUCTOR_TABS = [
+  { href: "/admin/my-sessions", label: "My sessions" },
+  { href: "/instructor", label: "My calendar" },
+];
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
-  React.useEffect(() => {
-    if (!loading && (!user || user.role !== "superuser")) router.replace("/");
-  }, [loading, user, router]);
+  const isSuperuser = user?.role === "superuser";
+  const isInstructor = user?.role === "instructor";
 
-  if (loading || !user || user.role !== "superuser") {
+  React.useEffect(() => {
+    if (loading) return;
+    if (!user || (!isSuperuser && !isInstructor)) {
+      router.replace("/");
+      return;
+    }
+    // An instructor landing on a superuser page goes to their own list rather
+    // than seeing a 403 they can do nothing about.
+    if (isInstructor && !pathname.startsWith("/admin/my-sessions")) {
+      router.replace("/admin/my-sessions");
+    }
+  }, [loading, user, isSuperuser, isInstructor, pathname, router]);
+
+  if (loading || !user || (!isSuperuser && !isInstructor)) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-32">
         <Loader2 className="size-4 animate-spin" /> Checking access…
@@ -35,11 +59,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  const tabs = isSuperuser ? SUPERUSER_TABS : INSTRUCTOR_TABS;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl tracking-tight">Admin</h1>
-      <nav className="mt-4 flex gap-1 border-b">
-        {TABS.map((tab) => (
+      {/* This shell is a client component, so it cannot export `metadata`.
+          React hoists a bare <meta> into <head>, which gets the same result:
+          robots.txt asks crawlers not to fetch /admin, and this tells anything
+          that arrived anyway not to index it. */}
+      <meta name="robots" content="noindex, nofollow" />
+      <h1 className="text-2xl tracking-tight">{isSuperuser ? "Admin" : "Teaching"}</h1>
+      <nav className="mt-4 flex flex-wrap gap-1 border-b">
+        {tabs.map((tab) => (
           <Link
             key={tab.href}
             href={tab.href}

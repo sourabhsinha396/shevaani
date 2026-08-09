@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 30
     refresh_token_ttl_days: int = 30
     token_encryption_key: str = ""
+    #: Reset links are short-lived on purpose — they arrive by email, which is
+    #: the weakest link in the chain.
+    password_reset_ttl_minutes: int = 30
 
     # Booking rules
     booking_timezone: str = "Asia/Kolkata"
@@ -52,11 +55,84 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
+    #: NOT razorpay_key_secret. Razorpay signs webhooks with a separate secret set
+    #: on the webhook itself, and mixing the two fails every signature check.
     razorpay_webhook_secret: str = ""
 
-    # Email
-    resend_api_key: str = ""
+    # Email — Brevo
+    brevo_api_key: str = ""
     email_from: str = "no-reply@shevaani.local"
+    email_from_name: str = "Shevaani"
+    #: Hours before a session that reminders go out. Each one is a separate mail.
+    session_reminder_hours: list[int] = [24, 1]
+
+    # Slack — operational notifications, off unless a webhook is configured.
+    slack_webhook_url: str = ""
+
+    # Object storage (S3-compatible: Cloudflare R2, AWS S3, MinIO)
+    s3_endpoint_url: str = ""
+    s3_region: str = "auto"
+    s3_bucket: str = ""
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+    #: Where the filesystem fallback writes when no bucket is configured.
+    local_storage_dir: str = "/tmp/shevaani-storage"
+
+    # Backups
+    backup_prefix: str = "backups/postgres"
+    backup_retention_days: int = 30
+    backup_hour_utc: int = 18  # 23:30 IST
+
+    # Rate limiting
+    rate_limit_enabled: bool = True
+    #: Only turn this on when something in front of the app *overwrites*
+    #: X-Forwarded-For. If the header is merely appended to, or absent, a caller
+    #: can set it themselves and every per-IP limit becomes opt-out.
+    trust_proxy_headers: bool = False
+
+    #: Signs the sqladmin cookie at /admin. Separate from JWT_SECRET so rotating
+    #: one doesn't invalidate the other; falls back to it when unset.
+    admin_session_secret_key: str = ""
+
+    #: Whether /docs, /redoc and /openapi.json are served at all. ``None`` means
+    #: "on locally, off everywhere else", which is the answer in every normal
+    #: deployment. Setting it True outside local does not make them public —
+    #: :mod:`app.api.docs` puts them behind superuser auth.
+    expose_api_docs: bool | None = None
+
+    @property
+    def admin_session_secret(self) -> str:
+        return self.admin_session_secret_key or self.jwt_secret
+
+    @property
+    def is_local(self) -> bool:
+        """A developer's machine or CI — never a deployed environment.
+
+        Everything that leaks internals (API docs, tracebacks, the schema map)
+        keys off this rather than off ``environment != "production"``, so a
+        staging box gets the production treatment by default instead of by
+        somebody remembering to set a flag.
+        """
+        return self.environment.lower() in {"development", "local", "test"}
+
+    @property
+    def docs_enabled(self) -> bool:
+        return self.is_local if self.expose_api_docs is None else self.expose_api_docs
+
+    @property
+    def email_configured(self) -> bool:
+        """No provider key means outbound mail is logged, not sent — which is what
+        makes local development work without an external account."""
+        return bool(self.brevo_api_key)
+
+    @property
+    def slack_configured(self) -> bool:
+        return bool(self.slack_webhook_url)
+
+    @property
+    def storage_configured(self) -> bool:
+        """False falls back to the filesystem, so local dev needs no bucket."""
+        return bool(self.s3_bucket and self.s3_access_key_id and self.s3_secret_access_key)
 
     @field_validator("one_on_one_window_start", "one_on_one_window_end", mode="before")
     @classmethod

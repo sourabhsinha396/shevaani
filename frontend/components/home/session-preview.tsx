@@ -70,7 +70,7 @@ export function SessionPreview() {
             Eight people, fifty minutes, everybody talks.
           </h2>
           <p className="text-muted-foreground mt-5 text-pretty">
-            A facilitator watches the room and pulls in whoever has gone quiet.
+            An instructor watches the room and pulls in whoever has gone quiet.
             Nobody sits through someone else&apos;s lecture, and nobody dominates
             — the split on each tile is what a normal session looks like.
           </p>

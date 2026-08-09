@@ -11,16 +11,38 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import DbSession, Superuser
 from app.api.serializers import build_session_admin_out, seat_counts, waitlist_counts
+from app.api.serializers import session_roster as roster_for
+from app.models.billing import CreditLedger
 from app.models.booking import Booking
-from app.models.enums import BookingStatus, SessionKind, SessionStatus, UserRole
+from app.models.contact import ContactMessage
+from app.models.enums import (
+    SEAT_HOLDING_STATUSES,
+    CreditReason,
+    SessionKind,
+    SessionStatus,
+    UserRole,
+)
 from app.models.session import Session
 from app.models.user import GoogleCredential, User
+from app.schemas.admin import (
+    CancellationImpactOut,
+    ContactHandledIn,
+    CreditAdjustIn,
+    CreditBalanceOut,
+    InstructorAdminIn,
+    InstructorAdminOut,
+    LearnerBookingOut,
+    LearnerDetailOut,
+    LearnerSummaryOut,
+    LedgerEntryOut,
+)
 from app.schemas.common import Message
+from app.schemas.contact import ContactMessageOut
 from app.schemas.session import (
     CancelIn,
     GroupSessionCreateIn,
@@ -29,8 +51,8 @@ from app.schemas.session import (
     SessionAdminOut,
 )
 from app.services import booking as booking_service
-from app.services import session_admin
-from app.services.errors import NotFound
+from app.services import credits, session_admin
+from app.services.errors import Conflict, NotFound
 from app.services.scheduling import utc_now
 from app.workers import queue
 
@@ -94,6 +116,11 @@ async def list_sessions(
         )
         for s in sessions
     ]
+
+
+@router.get("/sessions/{session_id}", response_model=SessionAdminOut)
+async def get_session(session_id: uuid.UUID, db: DbSession, _: Superuser) -> SessionAdminOut:
+    return await _serialize(db, await _load(db, session_id))
 
 
 @router.post(
@@ -210,57 +237,159 @@ async def retry_meeting(session_id: uuid.UUID, db: DbSession, _: Superuser) -> M
 @router.get("/sessions/{session_id}/roster")
 async def session_roster(session_id: uuid.UUID, db: DbSession, _: Superuser) -> dict:
     await _load(db, session_id)
-    result = await db.execute(
-        select(Booking)
-        .options(selectinload(Booking.learner))
-        .where(Booking.session_id == session_id, Booking.status != BookingStatus.CANCELLED)
-        .order_by(Booking.status, Booking.waitlist_position, Booking.created_at)
-    )
-    bookings = list(result.scalars().all())
-    return {
-        "confirmed": [
-            {
-                "booking_id": str(b.id),
-                "name": b.learner.full_name,
-                "email": b.learner.email,
-                "level": b.learner.level.value if b.learner.level else None,
-                "first_joined_at": b.first_joined_at,
-                "attendance_confirmed_at": b.attendance_confirmed_at,
-            }
-            for b in bookings
-            if b.status != BookingStatus.WAITLISTED
-        ],
-        "waitlist": [
-            {
-                "booking_id": str(b.id),
-                "name": b.learner.full_name,
-                "position": b.waitlist_position,
-            }
-            for b in bookings
-            if b.status == BookingStatus.WAITLISTED
-        ],
-    }
+    return await roster_for(db, session_id)
+
+
+@router.get("/sessions/{session_id}/cancellation-impact", response_model=CancellationImpactOut)
+async def cancellation_impact(
+    session_id: uuid.UUID, db: DbSession, _: Superuser
+) -> CancellationImpactOut:
+    """What cancelling would cost, so the confirm dialog can say it out loud.
+
+    Cancelling a session refunds every live booking regardless of the usual
+    12-hour cutoff, which is not obvious from the button.
+    """
+    session = await _load(db, session_id)
+    return CancellationImpactOut(**await booking_service.cancellation_impact(db, session))
 
 
 @router.post("/bookings/{booking_id}/attendance", response_model=Message)
 async def mark_attendance(
     booking_id: uuid.UUID, db: DbSession, _: Superuser, attended: Annotated[bool, Query()] = True
 ) -> Message:
-    """Instructor-confirmed attendance.
-
-    `conferenceRecords` is Workspace-only, so join-clicks are the automatic
-    signal and this is the authoritative correction.
-    """
     booking = await db.get(Booking, booking_id)
     if booking is None:
         raise NotFound("Booking not found.")
-    booking.status = BookingStatus.ATTENDED if attended else BookingStatus.NO_SHOW
-    booking.attendance_confirmed_at = utc_now()
+    await booking_service.record_attendance(db, booking, attended=attended)
     return Message(detail="Attendance recorded.")
 
 
-@router.get("/instructors")
-async def list_instructors_admin(db: DbSession, _: Superuser) -> list[dict]:
+# ------------------------------------------------------------------ learners
+
+
+async def _learner_summary(db: DbSession, user: User) -> LearnerSummaryOut:
+    upcoming = await db.execute(
+        select(func.count(Booking.id)).where(
+            Booking.learner_id == user.id,
+            Booking.status.in_(SEAT_HOLDING_STATUSES),
+            Booking.starts_at >= utc_now(),
+        )
+    )
+    return LearnerSummaryOut(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        level=user.level,
+        is_active=user.is_active,
+        timezone=user.timezone,
+        created_at=user.created_at,
+        balance=await credits.balance(db, user.id),
+        upcoming_bookings=int(upcoming.scalar_one()),
+    )
+
+
+@router.get("/learners", response_model=list[LearnerSummaryOut])
+async def list_learners(
+    db: DbSession,
+    _: Superuser,
+    query: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[LearnerSummaryOut]:
+    """Name/email search. Support questions arrive as "someone called Priya",
+    so this matches on both rather than requiring an exact address."""
+    conditions = [User.role == UserRole.LEARNER]
+    if query:
+        pattern = f"%{query.strip().lower()}%"
+        conditions.append(
+            func.lower(User.full_name).like(pattern) | func.lower(User.email).like(pattern)
+        )
+
+    result = await db.execute(
+        select(User)
+        .where(*conditions)
+        .order_by(User.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return [await _learner_summary(db, user) for user in result.scalars().all()]
+
+
+@router.get("/learners/{learner_id}", response_model=LearnerDetailOut)
+async def learner_detail(
+    learner_id: uuid.UUID, db: DbSession, _: Superuser
+) -> LearnerDetailOut:
+    user = await db.get(User, learner_id)
+    if user is None:
+        raise NotFound("Learner not found.")
+
+    bookings = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.session))
+        .where(Booking.learner_id == learner_id)
+        .order_by(Booking.starts_at.desc())
+        .limit(100)
+    )
+    ledger = await db.execute(
+        select(CreditLedger)
+        .where(CreditLedger.user_id == learner_id)
+        .order_by(CreditLedger.created_at.desc())
+        .limit(100)
+    )
+
+    return LearnerDetailOut(
+        learner=await _learner_summary(db, user),
+        bookings=[
+            LearnerBookingOut(
+                id=b.id,
+                session_id=b.session_id,
+                session_title=b.session.title,
+                status=b.status,
+                starts_at=b.starts_at,
+                ends_at=b.ends_at,
+                credits_spent=b.credits_spent,
+                waitlist_position=b.waitlist_position,
+                cancelled_at=b.cancelled_at,
+            )
+            for b in bookings.scalars().all()
+        ],
+        ledger=[LedgerEntryOut.model_validate(e) for e in ledger.scalars().all()],
+    )
+
+
+@router.post("/learners/{learner_id}/credits", response_model=CreditBalanceOut)
+async def adjust_credits(
+    learner_id: uuid.UUID, payload: CreditAdjustIn, db: DbSession, actor: Superuser
+) -> CreditBalanceOut:
+    """Hand-grant or claw back credits — what `make credits` does, from the UI.
+
+    Both directions are ledger rows; nothing is ever edited in place, so the
+    balance stays reconstructible from history.
+    """
+    user = await db.get(User, learner_id)
+    if user is None:
+        raise NotFound("Learner not found.")
+
+    await credits.lock_user(db, user.id)
+    note = payload.note or f"Adjusted by {actor.email}"
+
+    if payload.delta > 0:
+        await credits.grant(db, user.id, payload.delta, CreditReason.ADMIN_GRANT, note=note)
+    else:
+        # spend() refuses to go negative — a balance below zero would be a bug
+        # the ledger could never explain.
+        await credits.spend(
+            db, user.id, -payload.delta, CreditReason.ADMIN_REVOKE, note=note
+        )
+
+    return CreditBalanceOut(balance=await credits.balance(db, user.id))
+
+
+# --------------------------------------------------------------- instructors
+
+
+@router.get("/instructors", response_model=list[InstructorAdminOut])
+async def list_instructors_admin(db: DbSession, _: Superuser) -> list[InstructorAdminOut]:
     """Includes Google connection status — an instructor who hasn't connected
     can't host, so the session form must be able to grey them out."""
     result = await db.execute(
@@ -269,14 +398,98 @@ async def list_instructors_admin(db: DbSession, _: Superuser) -> list[dict]:
         .where(User.role.in_([UserRole.INSTRUCTOR, UserRole.SUPERUSER]))
         .order_by(User.full_name)
     )
+    rows = result.all()
+
+    upcoming = await db.execute(
+        select(Session.instructor_id, func.count(Session.id))
+        .where(
+            Session.starts_at >= utc_now(),
+            Session.status.in_([SessionStatus.DRAFT, SessionStatus.PUBLISHED]),
+        )
+        .group_by(Session.instructor_id)
+    )
+    counts = {row[0]: int(row[1]) for row in upcoming.all()}
+
     return [
-        {
-            "id": str(user.id),
-            "full_name": user.full_name,
-            "email": user.email,
-            "is_active": user.is_active,
-            "google_connected": credential is not None and credential.revoked_at is None,
-            "google_email": credential.google_email if credential else None,
-        }
-        for user, credential in result.all()
+        InstructorAdminOut(
+            id=user.id,
+            full_name=user.full_name,
+            email=user.email,
+            is_active=user.is_active,
+            headline=user.headline,
+            bio=user.bio,
+            google_connected=credential is not None and credential.revoked_at is None,
+            google_email=credential.google_email if credential else None,
+            upcoming_sessions=counts.get(user.id, 0),
+        )
+        for user, credential in rows
     ]
+
+
+@router.patch("/instructors/{instructor_id}", response_model=Message)
+async def update_instructor(
+    instructor_id: uuid.UUID, payload: InstructorAdminIn, db: DbSession, _: Superuser
+) -> Message:
+    """Edit an existing instructor. Creating one stays in the CLI (decision 10)
+    — there is deliberately no self-service path into the role."""
+    user = await db.get(User, instructor_id)
+    if user is None or user.role not in (UserRole.INSTRUCTOR, UserRole.SUPERUSER):
+        raise NotFound("Instructor not found.")
+
+    if payload.is_active is False:
+        upcoming = await db.execute(
+            select(func.count(Session.id)).where(
+                Session.instructor_id == instructor_id,
+                Session.status == SessionStatus.PUBLISHED,
+                Session.starts_at >= utc_now(),
+            )
+        )
+        live = int(upcoming.scalar_one())
+        if live:
+            # Deactivating hides them from slot generation but does not cancel
+            # anything, so the sessions would sit there hostless.
+            raise Conflict(
+                f"{user.full_name} still has {live} published session(s) ahead. "
+                "Cancel or reassign those first."
+            )
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(user, field, value)
+    return Message(detail="Instructor updated.")
+
+
+# ----------------------------------------------------------------- contact
+
+
+@router.get("/contact-messages", response_model=list[ContactMessageOut])
+async def list_contact_messages(
+    db: DbSession,
+    _: Superuser,
+    handled: Annotated[bool | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ContactMessageOut]:
+    conditions = []
+    if handled is True:
+        conditions.append(ContactMessage.handled_at.is_not(None))
+    elif handled is False:
+        conditions.append(ContactMessage.handled_at.is_(None))
+
+    result = await db.execute(
+        select(ContactMessage)
+        .where(*conditions)
+        .order_by(ContactMessage.created_at.desc())
+        .limit(limit)
+    )
+    return [ContactMessageOut.model_validate(m) for m in result.scalars().all()]
+
+
+@router.post("/contact-messages/{message_id}/handled", response_model=Message)
+async def mark_contact_handled(
+    message_id: uuid.UUID, payload: ContactHandledIn, db: DbSession, _: Superuser
+) -> Message:
+    message = await db.get(ContactMessage, message_id)
+    if message is None:
+        raise NotFound("Message not found.")
+    message.handled_at = utc_now()
+    message.handled_note = payload.note
+    return Message(detail="Marked as handled.")

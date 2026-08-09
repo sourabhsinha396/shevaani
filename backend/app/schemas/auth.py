@@ -40,3 +40,21 @@ class AuthOut(BaseModel):
     #: Also set as httpOnly cookies. Returned for non-browser clients.
     access_token: str
     refresh_token: str
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
+    password: str = Field(min_length=10, max_length=128)
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=10, max_length=128)
+
+
+class VerifyEmailIn(BaseModel):
+    token: str = Field(min_length=16, max_length=512)

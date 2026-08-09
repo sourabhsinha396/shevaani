@@ -165,7 +165,7 @@ export default function SessionDetailPage() {
             <CardContent className="text-muted-foreground flex flex-col gap-2 text-sm">
               <p>
                 The Meet link appears on this page 15 minutes before the start. You may land
-                in a short lobby — the facilitator lets everyone in.
+                in a short lobby — the instructor lets everyone in.
               </p>
               <p>Headphones make a real difference to how well the group can hear each other.</p>
             </CardContent>
@@ -198,8 +198,8 @@ export default function SessionDetailPage() {
 
               <div className="text-muted-foreground border-t pt-4 text-sm">
                 Hosted by{" "}
-                <span className="text-foreground font-medium">{session.facilitator.full_name}</span>
-                {session.facilitator.headline && <> · {session.facilitator.headline}</>}
+                <span className="text-foreground font-medium">{session.instructor.full_name}</span>
+                {session.instructor.headline && <> · {session.instructor.headline}</>}
               </div>
 
               {booked ? (

@@ -46,3 +46,6 @@ class InstructorBlock(Base, UUIDPrimaryKey, Timestamped):
     )
 
     instructor: Mapped[User] = relationship(foreign_keys=[instructor_id])
+
+    def __str__(self) -> str:
+        return f"{self.reason.value} · {self.starts_at:%d %b %H:%M}–{self.ends_at:%H:%M} UTC"

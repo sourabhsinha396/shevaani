@@ -77,7 +77,7 @@ function GoogleCard() {
   );
 }
 
-export default function FacilitatorPage() {
+export default function InstructorPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 

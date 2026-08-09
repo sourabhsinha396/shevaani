@@ -75,9 +75,12 @@ class Session(Base, UUIDPrimaryKey, Timestamped):
     meeting: Mapped[SessionMeeting | None] = relationship(
         back_populates="session", uselist=False, cascade="all, delete-orphan"
     )
-    bookings: Mapped[list["Booking"]] = relationship(  # noqa: F821
+    bookings: Mapped[list[Booking]] = relationship(  # noqa: F821
         back_populates="session", cascade="all, delete-orphan"
     )
+
+    def __str__(self) -> str:
+        return f"{self.title} — {self.starts_at:%d %b %Y %H:%M} UTC"
 
     @property
     def is_bookable(self) -> bool:
@@ -112,6 +115,9 @@ class SessionMeeting(Base, Timestamped):
     last_error: Mapped[str | None] = mapped_column(Text)
 
     session: Mapped[Session] = relationship(back_populates="meeting")
+
+    def __str__(self) -> str:
+        return f"Meet ({self.status.value})"
 
     @property
     def is_ready(self) -> bool:

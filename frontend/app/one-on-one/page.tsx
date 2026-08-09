@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Select } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
-import type { Facilitator, Slot } from "@/lib/types";
+import type { Instructor, Slot } from "@/lib/types";
 import { cn, formatDayLabel, formatTime } from "@/lib/utils";
 
 /** Next 14 days as YYYY-MM-DD, which is what the slots endpoint expects.
@@ -31,8 +31,8 @@ export default function OneOnOnePage() {
   const { user, refresh } = useAuth();
 
   const dates = React.useMemo(() => upcomingDates(), []);
-  const [facilitators, setFacilitators] = React.useState<Facilitator[]>([]);
-  const [facilitatorId, setFacilitatorId] = React.useState("");
+  const [instructors, setInstructors] = React.useState<Instructor[]>([]);
+  const [instructorId, setInstructorId] = React.useState("");
   const [date, setDate] = React.useState(dates[0]);
   const [duration, setDuration] = React.useState(60);
   const [slots, setSlots] = React.useState<Slot[]>([]);
@@ -44,21 +44,21 @@ export default function OneOnOnePage() {
 
   React.useEffect(() => {
     api
-      .listFacilitators()
+      .listInstructors()
       .then((list) => {
-        setFacilitators(list);
-        if (list.length > 0) setFacilitatorId(list[0].id);
+        setInstructors(list);
+        if (list.length > 0) setInstructorId(list[0].id);
       })
       .catch((e: Error) => setMessage({ kind: "error", text: e.message }));
   }, []);
 
   React.useEffect(() => {
-    if (!facilitatorId) return;
+    if (!instructorId) return;
     let cancelled = false;
     setLoadingSlots(true);
 
     api
-      .slots(facilitatorId, date, duration)
+      .slots(instructorId, date, duration)
       .then((data) => !cancelled && setSlots(data))
       .catch((e: Error) => !cancelled && setMessage({ kind: "error", text: e.message }))
       .finally(() => !cancelled && setLoadingSlots(false));
@@ -66,7 +66,7 @@ export default function OneOnOnePage() {
     return () => {
       cancelled = true;
     };
-  }, [facilitatorId, date, duration]);
+  }, [instructorId, date, duration]);
 
   async function book(slot: Slot) {
     if (!user) {
@@ -77,13 +77,13 @@ export default function OneOnOnePage() {
     setMessage(null);
     try {
       await api.bookOneOnOne({
-        facilitator_id: facilitatorId,
+        instructor_id: instructorId,
         starts_at: slot.starts_at,
         duration_minutes: duration,
       });
       setMessage({ kind: "info", text: "Booked. You'll find it under My sessions." });
       // The slot is gone now, and so is the hour either side of it.
-      setSlots(await api.slots(facilitatorId, date, duration));
+      setSlots(await api.slots(instructorId, date, duration));
       await refresh();
     } catch (e) {
       setMessage({ kind: "error", text: (e as ApiError).message });
@@ -97,7 +97,7 @@ export default function OneOnOnePage() {
       <header>
         <h1 className="text-3xl tracking-tight sm:text-4xl">One-to-one sessions</h1>
         <p className="text-muted-foreground mt-2 max-w-lg text-pretty">
-          The whole hour is yours. Pick a facilitator and a time that suits you.
+          The whole hour is yours. Pick an instructor and a time that suits you.
         </p>
       </header>
 
@@ -113,10 +113,10 @@ export default function OneOnOnePage() {
       </Card>
 
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <Field label="Facilitator">
-          <Select value={facilitatorId} onChange={(e) => setFacilitatorId(e.target.value)}>
-            {facilitators.length === 0 && <option value="">No facilitators yet</option>}
-            {facilitators.map((f) => (
+        <Field label="Instructor">
+          <Select value={instructorId} onChange={(e) => setInstructorId(e.target.value)}>
+            {instructors.length === 0 && <option value="">No instructors yet</option>}
+            {instructors.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.full_name}
               </option>

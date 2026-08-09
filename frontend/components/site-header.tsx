@@ -67,14 +67,16 @@ export function SiteHeader() {
                 <Coins className="size-3" />
                 {credits} credits
               </Badge>
-              {user.role === "superuser" && (
+              {/* Both roles land on /admin; the shell decides what they see
+                  there, and every endpoint behind it re-checks the role. */}
+              {(user.role === "instructor" || user.role === "superuser") && (
                 <Link href="/admin" className={cn(navLink, "text-muted-foreground hidden sm:inline")}>
-                  Admin
+                  {user.role === "superuser" ? "Admin" : "Teaching"}
                 </Link>
               )}
-              {(user.role === "facilitator" || user.role === "superuser") && (
+              {(user.role === "instructor" || user.role === "superuser") && (
                 <Link
-                  href="/facilitator"
+                  href="/instructor"
                   className={cn(navLink, "text-muted-foreground hidden sm:inline")}
                 >
                   Calendar
@@ -82,6 +84,12 @@ export function SiteHeader() {
               )}
               <Link href="/dashboard" className={cn(navLink, "text-foreground")}>
                 My sessions
+              </Link>
+              <Link
+                href="/account"
+                className={cn(navLink, "text-muted-foreground hidden sm:inline")}
+              >
+                Account
               </Link>
               <ThemeToggle />
               <button

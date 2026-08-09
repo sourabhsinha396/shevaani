@@ -31,11 +31,11 @@ const FAQS = [
   },
   {
     q: "When can I book a one-to-one?",
-    a: "Between 07:00 and 19:00 IST, and each booking keeps an hour clear on either side so your facilitator is never running one session straight into the next.",
+    a: "Between 07:00 and 19:00 IST, and each booking keeps an hour clear on either side so your instructor is never running one session straight into the next.",
   },
   {
     q: "Which video tool do you use?",
-    a: "Google Meet. The link appears on your dashboard fifteen minutes before the session — no installs and no meeting IDs to type. Your facilitator hosts, so join a couple of minutes early and they will let you in.",
+    a: "Google Meet. The link appears on your dashboard fifteen minutes before the session — no installs and no meeting IDs to type. Your instructor hosts, so join a couple of minutes early and they will let you in.",
   },
   {
     q: "Do credits expire?",

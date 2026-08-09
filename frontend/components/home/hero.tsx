@@ -53,7 +53,7 @@ export function Hero() {
           </h1>
 
           <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg text-pretty">
-            Small-group discussions with real people and a facilitator who keeps
+            Small-group discussions with real people and an instructor who keeps
             everyone talking. Or book a one-to-one when you want the floor to
             yourself.
           </p>

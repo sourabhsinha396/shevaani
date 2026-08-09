@@ -75,7 +75,7 @@ export function SessionCard({
         </div>
 
         <p className="text-muted-foreground text-sm">
-          Hosted by <span className="text-foreground font-medium">{session.facilitator.full_name}</span>
+          Hosted by <span className="text-foreground font-medium">{session.instructor.full_name}</span>
         </p>
       </CardContent>
 

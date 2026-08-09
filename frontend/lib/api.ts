@@ -1,13 +1,23 @@
 import type {
-  AdminFacilitator,
+  AdminInstructor,
   AdminSession,
   Block,
+  BillingProfile,
   Booking,
   BookingWithSession,
+  CancellationImpact,
   CEFRLevel,
+  CheckoutSession,
+  ContactMessage,
+  CreditPack,
   DiscussionSession,
-  Facilitator,
+  Instructor,
   JoinInfo,
+  LearnerDetail,
+  LearnerSummary,
+  LedgerEntry,
+  Payment,
+  Roster,
   Slot,
   User,
 } from "./types";
@@ -87,6 +97,36 @@ export const api = {
 
   me: () => request<User>("/auth/me"),
 
+  /** Always resolves with the same message, registered address or not. */
+  forgotPassword: (email: string) =>
+    request<{ detail: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  /** Signs the browser in on success — the mailbox has just been proven. */
+  resetPassword: (token: string, password: string) =>
+    request<{ user: User; access_token: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
+
+  /** Signs every *other* browser out. This one gets fresh cookies back. */
+  changePassword: (current_password: string, new_password: string) =>
+    request<{ user: User; access_token: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password }),
+    }),
+
+  sendEmailVerification: () =>
+    request<{ detail: string }>("/auth/verify-email/send", { method: "POST" }),
+
+  verifyEmail: (token: string) =>
+    request<User>("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
   // ---- catalogue
   listDiscussions: (params: {
     level?: CEFRLevel;
@@ -119,7 +159,7 @@ export const api = {
     }),
 
   bookOneOnOne: (payload: {
-    facilitator_id: string;
+    instructor_id: string;
     starts_at: string;
     duration_minutes?: number;
   }) =>
@@ -130,45 +170,91 @@ export const api = {
 
   creditBalance: () => request<{ balance: number }>("/bookings/credits/balance"),
 
-  // ---- facilitators
-  listFacilitators: () => request<Facilitator[]>("/facilitators"),
+  creditLedger: (limit = 50) =>
+    request<LedgerEntry[]>(`/bookings/credits/ledger${qs({ limit })}`),
+
+  // ---- billing
+  billingProfile: () => request<BillingProfile>("/billing/profile"),
+
+  /** Packs the caller can buy, already narrowed to their billing currency. */
+  creditPacks: () => request<CreditPack[]>("/billing/packs"),
+
+  /** Opens an order. Grants nothing — only the webhook does that. */
+  startCheckout: (packId: string) =>
+    request<CheckoutSession>("/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ pack_id: packId }),
+    }),
+
+  payment: (id: string) => request<Payment>(`/billing/payments/${id}`),
+
+  myPayments: () => request<Payment[]>("/billing/payments"),
+
+  // ---- instructors
+  listInstructors: () => request<Instructor[]>("/instructors"),
 
   /** `date` is a local calendar date (YYYY-MM-DD) in the booking timezone. */
-  slots: (facilitatorId: string, date: string, durationMinutes?: number) =>
+  slots: (instructorId: string, date: string, durationMinutes?: number) =>
     request<Slot[]>(
-      `/facilitators/${facilitatorId}/slots${qs({
+      `/instructors/${instructorId}/slots${qs({
         date,
         duration_minutes: durationMinutes,
       })}`,
     ),
 
-  listBlocks: (facilitatorId: string, until?: string) =>
-    request<Block[]>(`/facilitators/${facilitatorId}/blocks${qs({ until })}`),
+  listBlocks: (instructorId: string, until?: string) =>
+    request<Block[]>(`/instructors/${instructorId}/blocks${qs({ until })}`),
 
   createBlock: (
-    facilitatorId: string,
+    instructorId: string,
     payload: { starts_at: string; ends_at: string; reason?: string; note?: string },
   ) =>
-    request<Block>(`/facilitators/${facilitatorId}/blocks`, {
+    request<Block>(`/instructors/${instructorId}/blocks`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
 
-  deleteBlock: (facilitatorId: string, blockId: string) =>
-    request<{ detail: string }>(`/facilitators/${facilitatorId}/blocks/${blockId}`, {
+  deleteBlock: (instructorId: string, blockId: string) =>
+    request<{ detail: string }>(`/instructors/${instructorId}/blocks/${blockId}`, {
       method: "DELETE",
     }),
 
   googleStatus: () =>
     request<{ connected: boolean; google_email: string | null; connected_at: string | null }>(
-      "/facilitators/google/status",
+      "/instructors/google/status",
     ),
 
-  googleConnectUrl: () => `${PREFIX}/facilitators/google/connect`,
+  googleConnectUrl: () => `${PREFIX}/instructors/google/connect`,
+
+  // ---- contact
+  contact: (payload: {
+    name: string;
+    email: string;
+    subject: string;
+    body: string;
+  }) =>
+    request<{ detail: string }>("/contact", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // ---- the instructor's own work (scoped server-side to the caller)
+  myInstructorSessions: () => request<AdminSession[]>("/instructors/me/sessions"),
+
+  myInstructorRoster: (sessionId: string) =>
+    request<Roster>(`/instructors/me/sessions/${sessionId}/roster`),
+
+  myConfirmAttendance: (bookingId: string, attended: boolean) =>
+    request<{ detail: string }>(
+      `/instructors/me/bookings/${bookingId}/attendance${qs({ attended })}`,
+      { method: "POST" },
+    ),
 
   // ---- admin
   adminListSessions: (params: { status?: string; kind?: string } = {}) =>
     request<AdminSession[]>(`/admin/sessions${qs(params)}`),
+
+  adminGetSession: (id: string) => request<AdminSession>(`/admin/sessions/${id}`),
 
   adminCreateSession: (payload: Record<string, unknown>) =>
     request<AdminSession>("/admin/sessions", {
@@ -194,18 +280,53 @@ export const api = {
   adminRetryMeeting: (id: string) =>
     request<{ detail: string }>(`/admin/sessions/${id}/retry-meeting`, { method: "POST" }),
 
-  adminRoster: (id: string) =>
-    request<{
-      confirmed: Array<{
-        booking_id: string;
-        name: string;
-        email: string;
-        level: string | null;
-        first_joined_at: string | null;
-        attendance_confirmed_at: string | null;
-      }>;
-      waitlist: Array<{ booking_id: string; name: string; position: number }>;
-    }>(`/admin/sessions/${id}/roster`),
+  adminRoster: (id: string) => request<Roster>(`/admin/sessions/${id}/roster`),
 
-  adminFacilitators: () => request<AdminFacilitator[]>("/admin/facilitators"),
+  /** What cancelling would cost, for the confirm dialog. */
+  adminCancellationImpact: (id: string) =>
+    request<CancellationImpact>(`/admin/sessions/${id}/cancellation-impact`),
+
+  adminReschedule: (id: string, payload: { starts_at: string; duration_minutes?: number }) =>
+    request<AdminSession>(`/admin/sessions/${id}/reschedule`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  adminAttendance: (bookingId: string, attended: boolean) =>
+    request<{ detail: string }>(
+      `/admin/bookings/${bookingId}/attendance${qs({ attended })}`,
+      { method: "POST" },
+    ),
+
+  adminInstructors: () => request<AdminInstructor[]>("/admin/instructors"),
+
+  adminUpdateInstructor: (
+    id: string,
+    payload: { full_name?: string; headline?: string | null; bio?: string | null; is_active?: boolean },
+  ) =>
+    request<{ detail: string }>(`/admin/instructors/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  adminLearners: (query?: string) =>
+    request<LearnerSummary[]>(`/admin/learners${qs({ query })}`),
+
+  adminLearner: (id: string) => request<LearnerDetail>(`/admin/learners/${id}`),
+
+  /** Signed: positive grants, negative claws back. Both are ledger rows. */
+  adminAdjustCredits: (id: string, delta: number, note?: string) =>
+    request<{ balance: number }>(`/admin/learners/${id}/credits`, {
+      method: "POST",
+      body: JSON.stringify({ delta, note }),
+    }),
+
+  adminContactMessages: (handled?: boolean) =>
+    request<ContactMessage[]>(`/admin/contact-messages${qs({ handled })}`),
+
+  adminMarkContactHandled: (id: string, note?: string) =>
+    request<{ detail: string }>(`/admin/contact-messages/${id}/handled`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
 };

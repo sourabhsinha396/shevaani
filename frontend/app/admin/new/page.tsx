@@ -8,18 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import type { AdminFacilitator, CEFRLevel } from "@/lib/types";
+import type { AdminInstructor, CEFRLevel } from "@/lib/types";
 
 const LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export default function NewSessionPage() {
   const router = useRouter();
-  const [facilitators, setFacilitators] = React.useState<AdminFacilitator[]>([]);
+  const [instructors, setInstructors] = React.useState<AdminInstructor[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const [form, setForm] = React.useState({
-    facilitator_id: "",
+    instructor_id: "",
     title: "",
     topic: "",
     description: "",
@@ -36,16 +36,16 @@ export default function NewSessionPage() {
 
   React.useEffect(() => {
     api
-      .adminFacilitators()
+      .adminInstructors()
       .then((list) => {
-        setFacilitators(list);
+        setInstructors(list);
         const hostable = list.find((f) => f.google_connected && f.is_active);
-        if (hostable) setForm((prev) => ({ ...prev, facilitator_id: hostable.id }));
+        if (hostable) setForm((prev) => ({ ...prev, instructor_id: hostable.id }));
       })
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  const selected = facilitators.find((f) => f.id === form.facilitator_id);
+  const selected = instructors.find((f) => f.id === form.instructor_id);
   const cannotHost = form.publish && selected && !selected.google_connected;
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -81,16 +81,16 @@ export default function NewSessionPage() {
       <CardContent>
         <form onSubmit={submit} className="flex flex-col gap-5">
           <Field
-            label="Facilitator"
-            hint="Only facilitators who have connected a Google account can host — the Meet link is created on their calendar."
+            label="Instructor"
+            hint="Only instructors who have connected a Google account can host — the Meet link is created on their calendar."
           >
             <Select
               required
-              value={form.facilitator_id}
-              onChange={(e) => update("facilitator_id", e.target.value)}
+              value={form.instructor_id}
+              onChange={(e) => update("instructor_id", e.target.value)}
             >
-              <option value="">Choose a facilitator…</option>
-              {facilitators.map((f) => (
+              <option value="">Choose an instructor…</option>
+              {instructors.map((f) => (
                 <option key={f.id} value={f.id} disabled={!f.is_active}>
                   {f.full_name}
                   {f.google_connected ? "" : " — no Google account"}

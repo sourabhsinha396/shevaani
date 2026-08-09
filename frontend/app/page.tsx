@@ -25,7 +25,7 @@ const STATS = [
 const STEPS = [
   { n: "01", title: "Pick a discussion", body: "Browse by level, topic and time. Book with a credit." },
   { n: "02", title: "Read the prep", body: "A short article and a handful of questions, a day ahead." },
-  { n: "03", title: "Show up and talk", body: "A facilitator keeps it moving and everyone gets airtime." },
+  { n: "03", title: "Show up and talk", body: "An instructor keeps it moving and everyone gets airtime." },
 ];
 
 export default function HomePage() {

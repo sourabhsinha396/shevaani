@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.booking import Booking
 from app.models.enums import SEAT_HOLDING_STATUSES, BookingStatus
@@ -67,6 +68,52 @@ async def my_booking_statuses(
     return {row[0]: row[1] for row in result.all()}
 
 
+async def session_roster(
+    db: AsyncSession, session_id: uuid.UUID, *, include_emails: bool = True
+) -> dict:
+    """Who is in the room, and who is next in line.
+
+    Shared by the superuser admin and the instructor's own view — the two must
+    not be allowed to disagree about who is on the list. They differ in exactly
+    one respect: an instructor gets names and levels, not contact details, which
+    is what the privacy policy promises learners. That is enforced by leaving the
+    address out of the payload, not by hiding a column in the UI.
+    """
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.learner))
+        .where(Booking.session_id == session_id, Booking.status != BookingStatus.CANCELLED)
+        .order_by(Booking.status, Booking.waitlist_position, Booking.created_at)
+    )
+    bookings = list(result.scalars().all())
+    return {
+        "confirmed": [
+            {
+                "booking_id": str(b.id),
+                "learner_id": str(b.learner_id),
+                "name": b.learner.full_name,
+                "email": b.learner.email if include_emails else None,
+                "level": b.learner.level.value if b.learner.level else None,
+                "status": b.status.value,
+                "first_joined_at": b.first_joined_at,
+                "attendance_confirmed_at": b.attendance_confirmed_at,
+            }
+            for b in bookings
+            if b.status != BookingStatus.WAITLISTED
+        ],
+        "waitlist": [
+            {
+                "booking_id": str(b.id),
+                "learner_id": str(b.learner_id),
+                "name": b.learner.full_name,
+                "position": b.waitlist_position,
+            }
+            for b in bookings
+            if b.status == BookingStatus.WAITLISTED
+        ],
+    }
+
+
 def build_session_out(
     session: Session,
     *,
@@ -75,6 +122,7 @@ def build_session_out(
 ) -> SessionOut:
     return SessionOut(
         id=session.id,
+        kind=session.kind,
         title=session.title,
         topic=session.topic,
         description=session.description,

@@ -5,7 +5,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.models.enums import BlockReason, BookingStatus, CEFRLevel, MeetingStatus, SessionStatus
+from app.models.enums import (
+    BlockReason,
+    BookingStatus,
+    CEFRLevel,
+    MeetingStatus,
+    SessionKind,
+    SessionStatus,
+)
 from app.schemas.common import InstructorOut, ORMModel
 
 
@@ -17,6 +24,10 @@ class SessionOut(ORMModel):
     """
 
     id: uuid.UUID
+    #: Group or one-to-one. Serialised because a client cannot infer it — a
+    #: group discussion with one seat left, and a 1:1, are not the same thing
+    #: even though ``max_seats`` can be 1 for both.
+    kind: SessionKind
     title: str
     topic: str | None
     description: str | None

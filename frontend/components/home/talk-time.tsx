@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  *
  * `share` is the fraction of the clock that learners — not the person running
  * the room — are speaking for. It is higher here than in a classroom because a
- * facilitator's job is to ask a question and then get out of the way, and it is
+ * instructor's job is to ask a question and then get out of the way, and it is
  * only 0.5 in a one-to-one because the other half is your partner talking,
  * which you do want.
  *
@@ -51,7 +51,7 @@ export function TalkTime() {
     },
     {
       label: "Shevaani one-to-one",
-      detail: `${sessionMinutes} min · you and a facilitator`,
+      detail: `${sessionMinutes} min · you and an instructor`,
       minutes: minutesEach(sessionMinutes, 1, 0.5),
     },
     {
