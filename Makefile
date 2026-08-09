@@ -1,10 +1,27 @@
 COMPOSE = docker compose -f backend/docker-compose.yaml
 
-.PHONY: up down logs migrate revision superuser instructor credits packs psql shell test \
+FRONTEND = npm --prefix frontend
+
+.PHONY: up start dev front down logs migrate revision superuser instructor credits packs psql shell test \
         backup-now restore-drill
 
 up:
 	$(COMPOSE) up --build
+
+# Same as `up` but skips the image rebuild — for when only mounted code changed.
+start:
+	$(COMPOSE) up
+
+# Everything at once: API/worker/db in the background, Next.js in the foreground
+# so its logs and Ctrl-C belong to this terminal. Ctrl-C leaves the backend
+# running on purpose — `make down` when you're finished for the day.
+dev:
+	$(COMPOSE) up -d
+	$(FRONTEND) run dev
+
+# Just the Next.js dev server, for when the backend is already up.
+front:
+	$(FRONTEND) run dev
 
 down:
 	$(COMPOSE) down
