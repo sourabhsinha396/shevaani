@@ -66,7 +66,7 @@ export async function generateMetadata({
     title: session.title,
     description:
       session.description?.slice(0, 160) ??
-      `A ${session.level_min}–${session.level_max} English discussion on ${when} IST. Six learners at most, and everyone speaks.`,
+      `An English discussion on ${when} IST. Six learners at most, and everyone speaks.`,
     path: `/discussions/${session.id}`,
     // A cancelled session's page still exists so a learner following an old
     // link learns what happened — but it has no business in search results.

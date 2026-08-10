@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import type { AdminInstructor, CEFRLevel } from "@/lib/types";
-
-const LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
+import type { AdminInstructor } from "@/lib/types";
 
 export default function NewSessionPage() {
   const router = useRouter();
@@ -29,8 +27,6 @@ export default function NewSessionPage() {
     min_seats: 3,
     max_seats: 6,
     price_credits: 1,
-    level_min: "A2" as CEFRLevel,
-    level_max: "C1" as CEFRLevel,
     publish: true,
   });
 
@@ -200,29 +196,6 @@ export default function NewSessionPage() {
                 value={form.price_credits}
                 onChange={(e) => update("price_credits", Number(e.target.value))}
               />
-            </Field>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Level from">
-              <Select
-                value={form.level_min}
-                onChange={(e) => update("level_min", e.target.value as CEFRLevel)}
-              >
-                {LEVELS.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Level to">
-              <Select
-                value={form.level_max}
-                onChange={(e) => update("level_max", e.target.value as CEFRLevel)}
-              >
-                {LEVELS.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </Select>
             </Field>
           </div>
 

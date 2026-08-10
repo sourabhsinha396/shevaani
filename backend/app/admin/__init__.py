@@ -25,8 +25,6 @@ def mount_admin(app: FastAPI) -> Admin:
         title="Shevaani data",
         authentication_backend=SuperuserAuth(
             secret_key=settings.admin_session_secret,
-            # The session cookie is a superuser credential — it does not travel
-            # over plain HTTP anywhere but a developer's machine.
             https_only=settings.environment == "production",
             same_site="lax",
             max_age=60 * 60 * 8,

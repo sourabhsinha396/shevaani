@@ -27,6 +27,12 @@ dependencies = [
     # S3-compatible object storage (Cloudflare R2 / S3). Synchronous, so every
     # call runs in a thread — see integrations/storage.py.
     "boto3>=1.35",
+    # The full IANA database, including the "backward" compatibility links that
+    # the slim base image's system tzdata leaves out. Without it `ZoneInfo` has
+    # ~486 zones and raises on every legacy alias — including `Asia/Calcutta`,
+    # which is what Chrome on Windows still reports across India, and which
+    # signup sends straight from the browser. Registration 422'd on it.
+    "tzdata>=2024.2",
 ]
 
 [project.optional-dependencies]

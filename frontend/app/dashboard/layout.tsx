@@ -10,7 +10,7 @@ import { pageMetadata } from "@/lib/seo";
  */
 export const metadata: Metadata = pageMetadata({
   title: "Your sessions",
-  description: "Your booked discussions, one-to-ones and credit balance.",
+  description: "Your booked discussions, one-to-ones and session balance.",
   path: "/dashboard",
   noindex: true,
 });

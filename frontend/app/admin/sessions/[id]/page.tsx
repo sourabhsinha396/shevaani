@@ -11,12 +11,10 @@ import { RosterPanel } from "@/components/admin/roster-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { Field, Input, Textarea } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import type { AdminSession, CEFRLevel, Roster } from "@/lib/types";
+import type { AdminSession, Roster } from "@/lib/types";
 import { durationMinutes, formatDateTime } from "@/lib/utils";
-
-const LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 /** `datetime-local` wants a local wall-clock string with no zone on it. */
 function toLocalInput(iso: string) {
@@ -44,8 +42,6 @@ export default function AdminSessionPage() {
     min_seats: 3,
     max_seats: 6,
     price_credits: 1,
-    level_min: "A2" as CEFRLevel,
-    level_max: "C1" as CEFRLevel,
   });
   const [schedule, setSchedule] = React.useState({ starts_at: "", duration_minutes: 45 });
 
@@ -62,8 +58,6 @@ export default function AdminSessionPage() {
           min_seats: found.min_seats,
           max_seats: found.max_seats,
           price_credits: found.price_credits,
-          level_min: found.level_min,
-          level_max: found.level_max,
         });
         setSchedule({
           starts_at: toLocalInput(found.starts_at),
@@ -129,9 +123,6 @@ export default function AdminSessionPage() {
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Badge variant="outline">{session.status}</Badge>
-          <Badge variant="secondary">
-            {session.level_min}–{session.level_max}
-          </Badge>
           <MeetingBadge status={session.meeting_status} error={session.meeting_last_error} />
           {session.meeting_host_email && (
             <span className="text-muted-foreground text-xs">
@@ -281,33 +272,6 @@ export default function AdminSessionPage() {
                     setDetails({ ...details, price_credits: Number(e.target.value) })
                   }
                 />
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Level from">
-                <Select
-                  value={details.level_min}
-                  onChange={(e) =>
-                    setDetails({ ...details, level_min: e.target.value as CEFRLevel })
-                  }
-                >
-                  {LEVELS.map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Level to">
-                <Select
-                  value={details.level_max}
-                  onChange={(e) =>
-                    setDetails({ ...details, level_max: e.target.value as CEFRLevel })
-                  }
-                >
-                  {LEVELS.map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </Select>
               </Field>
             </div>
 

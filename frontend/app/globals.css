@@ -162,6 +162,14 @@
     }
   }
 
+  /* The light that runs the border of a bento card on hover. A conic wedge is
+     spun behind the card and masked down to the border box. */
+  @keyframes border-sweep {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
   --animate-shiny-text: shiny-text 8s infinite;
 
   @keyframes shiny-text {

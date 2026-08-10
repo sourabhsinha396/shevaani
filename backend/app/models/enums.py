@@ -9,19 +9,6 @@ class UserRole(str, enum.Enum):
     SUPERUSER = "superuser"
 
 
-class CEFRLevel(str, enum.Enum):
-    A1 = "A1"
-    A2 = "A2"
-    B1 = "B1"
-    B2 = "B2"
-    C1 = "C1"
-    C2 = "C2"
-
-    @property
-    def rank(self) -> int:
-        return ["A1", "A2", "B1", "B2", "C1", "C2"].index(self.value)
-
-
 class SessionKind(str, enum.Enum):
     GROUP = "group"
     ONE_ON_ONE = "one_on_one"
@@ -87,3 +74,7 @@ class CreditReason(str, enum.Enum):
     SESSION_CANCELLED = "session_cancelled"
     ADMIN_GRANT = "admin_grant"
     ADMIN_REVOKE = "admin_revoke"
+    #: The welcome credit, given once at registration. Its own reason rather
+    #: than an ADMIN_GRANT with a note, so it can be counted and so the ledger
+    #: does not tell a learner that Shevaani "granted" them something by hand.
+    SIGNUP_BONUS = "signup_bonus"

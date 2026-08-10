@@ -15,15 +15,15 @@ import {
 const FAQS = [
   {
     q: "Do I need a certain level to join?",
-    a: "You need enough English to hold a slow conversation — roughly A2 and up. Every discussion is published with a CEFR band, and you book into the band that fits. If you land in a room that feels wrong, cancel and the credit comes straight back.",
+    a: "You need enough English to hold a slow conversation. Rooms are mixed rather than sorted by level, and the instructor's job is to keep everyone in it. If you land in one that feels wrong, cancel and the session comes straight back.",
   },
   {
     q: "What happens if not enough people book?",
-    a: "The session cancels itself two hours before it starts and refunds every learner's credit automatically. You will never be the only person in a room, and you never have to ask for the credit back.",
+    a: "The session cancels itself two hours before it starts and puts it back on every learner's balance automatically. You will never be the only person in a room, and you never have to ask for it back.",
   },
   {
     q: "How late can I cancel?",
-    a: "Up to twelve hours before the session. The credit returns to your account rather than going through a card refund, so it is instant and you can rebook the same evening.",
+    a: "Up to twelve hours before the session. It returns to your balance rather than going through a card refund, so it is instant and you can rebook the same evening.",
   },
   {
     q: "What if the discussion is full?",
@@ -38,8 +38,8 @@ const FAQS = [
     a: "Google Meet. The link appears on your dashboard fifteen minutes before the session — no installs and no meeting IDs to type. Your instructor hosts, so join a couple of minutes early and they will let you in.",
   },
   {
-    q: "Do credits expire?",
-    a: "No. One credit is one session, group or one-to-one, whenever you get round to using it.",
+    q: "Do they expire?",
+    a: "No. A session you have bought is yours to spend on a group discussion or a one-to-one, whenever you get round to it.",
   },
   {
     q: "Can I try it before paying?",
@@ -62,7 +62,7 @@ export function Faq() {
             >
               discussion list
             </Link>{" "}
-            shows the real thing — levels, times and how many seats are left.
+            shows the real thing — topics, times and how many seats are left.
           </p>
         </Reveal>
 

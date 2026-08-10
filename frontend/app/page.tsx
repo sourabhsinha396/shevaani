@@ -11,9 +11,8 @@ import { Testimonials } from "@/components/home/testimonials";
 import { Marquee, NumberTicker, Reveal, Ripple } from "@/components/magicui/effects";
 import { Button } from "@/components/ui/button";
 
-const TOPICS = [
-  "Remote work", "Climate", "Food & culture", "AI at work", "Travel stories",
-  "Money habits", "Sport", "Films worth arguing about", "City life", "Health",
+const FOR_WHOM = [
+  "For Sales Professionals", "For Working Professionals", "For Job Seekers", "For Placement Takers", "For MBA Students", "For College Students", "For Entrepreneurs", "For Afcat Aspirants", "For Cabin Crew", "For VISA Aspirants", "For IELTS Aspirants", "For TOEFL Aspirants", "For PTE Aspirants", "For OET Aspirants", "For GRE Aspirants", "For GMAT Aspirants", "For CAT Aspirants", "For UPSC Aspirants", "For Defence Aspirants"
 ];
 
 const STATS = [
@@ -23,7 +22,7 @@ const STATS = [
 ];
 
 const STEPS = [
-  { n: "01", title: "Pick a discussion", body: "Browse by level, topic and time. Book with a credit." },
+  { n: "01", title: "Pick a discussion", body: "Browse by topic and time. Book with one session." },
   { n: "02", title: "Read the prep", body: "A short article and a handful of questions, a day ahead." },
   { n: "03", title: "Show up and talk", body: "An instructor keeps it moving and everyone gets airtime." },
 ];
@@ -36,12 +35,12 @@ export default function HomePage() {
       {/* ------------------------------------------------------- topics */}
       <section className="border-border/60 bg-surface-subtle border-b py-6">
         <Marquee speed={45}>
-          {TOPICS.map((topic) => (
+          {FOR_WHOM.map((audience) => (
             <span
-              key={topic}
+              key={audience}
               className="text-muted-foreground border-border rounded-full border px-4 py-1.5 text-sm whitespace-nowrap"
             >
-              {topic}
+              {audience}
             </span>
           ))}
         </Marquee>
@@ -104,7 +103,7 @@ export default function HomePage() {
             Your first discussion is <span className="text-brand-ink">on us.</span>
           </h2>
           <p className="text-muted-foreground max-w-md text-pretty">
-            Make an account, claim a free credit, and join a group tonight.
+            Make an account, claim half your first session free, and join a group tonight.
           </p>
           <Button asChild size="lg" variant="brand">
             <Link href="/register">

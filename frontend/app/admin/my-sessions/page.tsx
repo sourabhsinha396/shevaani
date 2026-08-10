@@ -94,9 +94,6 @@ export default function MySessionsPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{session.status}</Badge>
-                    <Badge variant="secondary">
-                      {session.level_min}–{session.level_max}
-                    </Badge>
                     <MeetingBadge
                       status={session.meeting_status}
                       error={session.meeting_last_error}

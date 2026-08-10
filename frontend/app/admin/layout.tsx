@@ -23,6 +23,9 @@ const SUPERUSER_TABS = [
   { href: "/admin/learners", label: "Learners" },
   { href: "/admin/instructors", label: "Instructors" },
   { href: "/admin/messages", label: "Messages" },
+  // Last, and superuser-only: it is the tab that changes what the public site
+  // offers, which is not a thing an instructor gets to do.
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 const INSTRUCTOR_TABS = [

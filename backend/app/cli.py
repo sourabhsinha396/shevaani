@@ -27,7 +27,7 @@ from app.core.security import hash_password
 from app.models.billing import CreditPack
 from app.models.enums import CreditReason, UserRole
 from app.models.user import User
-from app.services import backups, credits
+from app.services import backups, credits, pricing
 
 
 class _EmailCheck(BaseModel):
@@ -77,8 +77,8 @@ async def _upsert_user(email: str, full_name: str, password: str, role: UserRole
 
 def _prompt_password() -> str:
     password = getpass.getpass("Password: ")
-    if len(password) < 10:
-        print("Password must be at least 10 characters.", file=sys.stderr)
+    if len(password) < 8:
+        print("Password must be at least 8 characters.", file=sys.stderr)
         raise SystemExit(1)
     if password != getpass.getpass("Confirm: "):
         print("Passwords do not match.", file=sys.stderr)
@@ -86,18 +86,29 @@ def _prompt_password() -> str:
     return password
 
 
-#: The price list, in minor units. Kept in step with `frontend/lib/pricing.ts`,
-#: which carries the marketing copy for the same slugs — the frontend joins the
-#: two on `slug`, so a pack added here without copy there renders bare.
+#: The price list, in US cents. This is the *only* price stored — INR, EUR, GBP
+#: and AUD are quoted from it by `app.services.pricing`, so re-pricing a pack is
+#: one number here rather than five rows to keep in step.
 #:
-#: Prices are per currency and never converted. ₹ and $ are separate rows.
-_PACKS: tuple[tuple[str, str, int, str, int], ...] = (
-    ("starter", "Starter", 5, "INR", 49_900),
-    ("regular", "Regular", 20, "INR", 169_900),
-    ("intensive", "Intensive", 50, "INR", 379_900),
-    ("starter", "Starter", 5, "USD", 900),
-    ("regular", "Regular", 20, "USD", 2_900),
-    ("intensive", "Intensive", 50, "USD", 6_500),
+#: Slugs must match the copy in `frontend/lib/pricing.ts`, which carries the
+#: blurb and feature list for the same packs and joins on `slug`; a pack added
+#: here without copy there renders bare.
+#: Credit counts are **multiples of SESSION_PRICE_CREDITS**. An odd pack strands
+#: the remainder forever — credits do not expire, so a leftover half-session is
+#: not lost value so much as permanently unusable value, which is worse to look
+#: at on a balance. Starter's 2 quote at ₹200, i.e. ₹200 a session: exactly the
+#: internal ₹100-a-credit anchor, with Regular and Intensive discounting below it.
+#:
+#: Sized in sessions — 1, 4, 12 — because that is the unit the buyer is shown and
+#: the only one they can act on. The credit column is that number doubled, and
+#: nothing outside this file and the ledger should need to know it.
+#:
+#: Per-session price is deliberately unchanged from the larger packs these
+#: replaced ($3.50 / $2.90 / $2.60): the packs got smaller, not dearer.
+_PACKS: tuple[tuple[str, str, int, int], ...] = (
+    ("starter", "Starter", 2, 350),
+    ("regular", "Regular", 8, 1_160),
+    ("intensive", "Intensive", 24, 3_120),
 )
 
 
@@ -108,14 +119,14 @@ async def _seed_packs() -> None:
     references these, and a re-seed must not orphan purchase history. Prices
     already copied onto a payment row are unaffected either way — that is the
     whole reason they are copied.
+
+    Every derived price is printed, not just the USD one. A rate or PPP change
+    re-prices four currencies silently otherwise, and "what does this actually
+    cost in rupees now" should not require running the conversion by hand.
     """
     async with SessionLocal() as db:
-        for slug, name, credits, currency, amount_minor in _PACKS:
-            result = await db.execute(
-                select(CreditPack).where(
-                    CreditPack.slug == slug, CreditPack.currency == currency
-                )
-            )
+        for slug, name, credits, usd_cents in _PACKS:
+            result = await db.execute(select(CreditPack).where(CreditPack.slug == slug))
             pack = result.scalar_one_or_none()
             if pack is None:
                 db.add(
@@ -123,8 +134,7 @@ async def _seed_packs() -> None:
                         slug=slug,
                         name=name,
                         credits=credits,
-                        currency=currency,
-                        amount_minor=amount_minor,
+                        usd_cents=usd_cents,
                         is_active=True,
                     )
                 )
@@ -132,10 +142,14 @@ async def _seed_packs() -> None:
             else:
                 pack.name = name
                 pack.credits = credits
-                pack.amount_minor = amount_minor
+                pack.usd_cents = usd_cents
                 pack.is_active = True
                 action = "updated"
-            print(f"{action}: {slug} {currency} {amount_minor} for {credits} credits")
+            quoted = ", ".join(
+                f"{code} {minor / 100:,.2f}"
+                for code, minor in pricing.localized(usd_cents).items()
+            )
+            print(f"{action}: {slug} ({credits} credits) — {quoted}")
         await db.commit()
 
 

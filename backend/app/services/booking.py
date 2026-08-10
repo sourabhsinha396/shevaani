@@ -13,6 +13,7 @@ are swept by :func:`release_expired_holds`.
 
 from __future__ import annotations
 
+import random
 import uuid
 from datetime import datetime, timedelta
 
@@ -26,23 +27,47 @@ from app.models.enums import (
     SEAT_HOLDING_STATUSES,
     BookingStatus,
     CreditReason,
-    SessionKind,
     SessionStatus,
 )
-from app.models.session import Session
+from app.models.session import OneOnOneSession, Session
 from app.models.user import User
-from app.services import credits, notifications, scheduling
-from app.services.errors import Conflict, NotFound, SchedulingError, SessionFull
+from app.services import credits, notifications, scheduling, site_settings
+from app.services.errors import (
+    Conflict,
+    FeatureDisabled,
+    NotFound,
+    SchedulingError,
+    SessionFull,
+)
 from app.services.scheduling import utc_now
 
 
 async def lock_session(db: AsyncSession, session_id: uuid.UUID) -> Session:
-    """Fetch a session with its row locked. Everything seat-related goes through here."""
+    """Fetch a group session with its row locked. Everything seat-related goes through here."""
     result = await db.execute(select(Session).where(Session.id == session_id).with_for_update())
     session = result.scalar_one_or_none()
     if session is None:
         raise NotFound("Session not found.")
     return session
+
+
+async def lock_one_on_one(db: AsyncSession, one_on_one_id: uuid.UUID) -> OneOnOneSession:
+    result = await db.execute(
+        select(OneOnOneSession).where(OneOnOneSession.id == one_on_one_id).with_for_update()
+    )
+    session = result.scalar_one_or_none()
+    if session is None:
+        raise NotFound("Session not found.")
+    return session
+
+
+async def lock_booked_session(
+    db: AsyncSession, booking: Booking
+) -> Session | OneOnOneSession:
+    """Lock whichever table this booking hangs off. The CHECK guarantees one."""
+    if booking.one_on_one_id is not None:
+        return await lock_one_on_one(db, booking.one_on_one_id)
+    return await lock_session(db, booking.parent_id)
 
 
 async def seats_taken(db: AsyncSession, session_id: uuid.UUID) -> int:
@@ -75,10 +100,10 @@ async def book_group_session(
     *,
     allow_waitlist: bool = True,
 ) -> Booking:
+    # No "is this a group session?" check any more — since 0009 the table it
+    # was looked up in is the answer.
     session = await lock_session(db, session_id)
 
-    if session.kind != SessionKind.GROUP:
-        raise Conflict("That is not a group discussion.")
     if session.status != SessionStatus.PUBLISHED:
         raise Conflict("This session is not open for booking.")
     if session.starts_at <= utc_now():
@@ -148,18 +173,88 @@ async def _add_to_waitlist(db: AsyncSession, session: Session, learner: User) ->
 
 async def book_one_on_one(
     db: AsyncSession,
-    instructor_id: uuid.UUID,
+    instructor_id: uuid.UUID | None,
     learner: User,
     starts_at: datetime,
     *,
     duration_minutes: int | None = None,
     title: str | None = None,
-    price_credits: int = 1,
-) -> tuple[Session, Booking]:
-    """Create the one-to-one session and the learner's booking in one transaction."""
+    price_credits: int | None = None,
+) -> tuple[OneOnOneSession, Booking]:
+    """Create the one-to-one session and the learner's booking in one transaction.
+
+    ``instructor_id`` is optional because the booking page does not offer a
+    choice of instructor — it offers times, pooled across everyone. When it is
+    ``None`` an instructor free at that hour is picked at random, and if the pick
+    collides (someone else booked them in the moment between the prefilter and
+    the row lock) the next candidate is tried. Random rather than
+    first-available so the load spreads instead of always landing on whoever
+    sorts first.
+    """
+    # The kill switch, checked here rather than in the route so it covers every
+    # caller. Hiding the link in the nav is presentation; this is what makes the
+    # flag mean the product is off.
+    if not await site_settings.is_enabled(db, "one_on_one_enabled"):
+        raise FeatureDisabled("One-to-one sessions aren't being booked at the moment.")
+
     duration = timedelta(minutes=duration_minutes or settings.one_on_one_slot_minutes)
     ends_at = starts_at + duration
+    # Same price as a group discussion, deliberately — see SESSION_PRICE_CREDITS.
+    if price_credits is None:
+        price_credits = settings.session_price_credits
 
+    if instructor_id is not None:
+        candidates = [instructor_id]
+    else:
+        # Checked once up front: it is the same answer for every instructor, and
+        # "we're closed then" is a better message than "nobody is free".
+        scheduling.validate_booking_window(starts_at, ends_at)
+        candidates = await scheduling.instructors_free_at(db, starts_at, ends_at)
+        random.shuffle(candidates)
+        if not candidates:
+            raise SchedulingError(
+                "Nobody is free at that time any more. Please pick another slot."
+            )
+
+    last_error: SchedulingError | None = None
+    for candidate in candidates:
+        try:
+            # A savepoint per attempt: a collision rolls back only this
+            # instructor's failed insert, leaving the transaction usable for the
+            # next one. Without it the first IntegrityError would poison it.
+            async with db.begin_nested():
+                return await _create_one_on_one(
+                    db,
+                    candidate,
+                    learner,
+                    starts_at,
+                    ends_at,
+                    title=title,
+                    price_credits=price_credits,
+                )
+        except SchedulingError as exc:
+            # Instructor-specific: blocked, clashing, or beaten to the insert.
+            # Anything else — no credits, the learner double-booking themselves —
+            # would fail identically against every instructor, so it propagates.
+            last_error = exc
+            continue
+
+    raise last_error or SchedulingError(
+        "That slot was taken while you were booking. Please pick another."
+    )
+
+
+async def _create_one_on_one(
+    db: AsyncSession,
+    instructor_id: uuid.UUID,
+    learner: User,
+    starts_at: datetime,
+    ends_at: datetime,
+    *,
+    title: str | None,
+    price_credits: int,
+) -> tuple[OneOnOneSession, Booking]:
+    """One attempt against one instructor. Runs inside a savepoint."""
     instructor = await db.get(User, instructor_id)
     if instructor is None or not instructor.is_active:
         raise NotFound("Instructor not found.")
@@ -167,18 +262,15 @@ async def book_one_on_one(
     # Lock order: instructor, then learner.
     await scheduling.lock_instructor(db, instructor_id)
     await scheduling.assert_instructor_available(
-        db, instructor_id, starts_at, ends_at, kind=SessionKind.ONE_ON_ONE
+        db, instructor_id, starts_at, ends_at, one_on_one=True
     )
     await credits.lock_user(db, learner.id)
 
-    session = Session(
-        kind=SessionKind.ONE_ON_ONE,
+    session = OneOnOneSession(
         status=SessionStatus.PUBLISHED,
         title=title or f"1:1 with {instructor.full_name}",
         starts_at=starts_at,
         ends_at=ends_at,
-        min_seats=1,
-        max_seats=1,
         price_credits=price_credits,
         instructor_id=instructor_id,
         created_by_id=learner.id,
@@ -188,13 +280,15 @@ async def book_one_on_one(
     try:
         await db.flush()
     except IntegrityError as exc:
-        await db.rollback()
+        # An exclusion constraint fired — either the engagement mirror (this
+        # instructor is committed elsewhere, group or 1:1) or the 1:1 buffer.
+        # Retryable against someone else, which is why it is a SchedulingError.
         raise SchedulingError(
             "That slot was taken while you were booking. Please pick another."
         ) from exc
 
     booking = Booking(
-        session_id=session.id,
+        one_on_one_id=session.id,
         learner_id=learner.id,
         status=BookingStatus.CONFIRMED,
         starts_at=starts_at,
@@ -206,7 +300,8 @@ async def book_one_on_one(
     try:
         await db.flush()
     except IntegrityError as exc:
-        await db.rollback()
+        # About the learner, not the instructor — trying another one would hit
+        # exactly the same constraint.
         raise Conflict(_explain_booking_conflict(exc)) from exc
 
     await credits.spend(
@@ -220,7 +315,7 @@ async def book_one_on_one(
     return session, booking
 
 
-def _refund_due(session: Session, at: datetime | None = None) -> bool:
+def _refund_due(session: Session | OneOnOneSession, at: datetime | None = None) -> bool:
     at = at or utc_now()
     cutoff = session.starts_at - timedelta(hours=settings.cancellation_full_refund_hours)
     return at <= cutoff
@@ -237,7 +332,7 @@ async def cancel_booking(
     if booking.status == BookingStatus.CANCELLED:
         return booking
 
-    session = await lock_session(db, booking.session_id)
+    session = await lock_booked_session(db, booking)
     await credits.lock_user(db, booking.learner_id)
 
     refund = booking.credits_spent > 0 and (force_refund or _refund_due(session))
@@ -261,7 +356,9 @@ async def cancel_booking(
 
     await notifications.booking_cancelled(db, booking, credits_refunded=refunded)
 
-    if session.kind == SessionKind.GROUP and session.status == SessionStatus.PUBLISHED:
+    # Only a group discussion has a waitlist to promote from; a 1:1 freed by a
+    # cancellation goes back to the open calendar, not to a queue.
+    if isinstance(session, Session) and session.status == SessionStatus.PUBLISHED:
         promoted = await promote_from_waitlist(db, session)
         await notifications.waitlist_promoted(db, session, promoted)
     return booking

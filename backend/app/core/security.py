@@ -13,8 +13,12 @@ from app.core.config import settings
 
 _hasher = PasswordHasher()
 
+#: The only kind of JWT this app issues. Password reset and email verification
+#: use database-backed tokens instead (``models/auth.py``), so the claim is not
+#: distinguishing between two live schemes — it is there so a token minted by an
+#: older build, back when refresh tokens existed, cannot be replayed as a
+#: session. Those are valid for up to 30 days from whenever they were issued.
 ACCESS_TOKEN = "access"
-REFRESH_TOKEN = "refresh"
 
 
 def hash_password(password: str) -> str:
@@ -46,20 +50,17 @@ def _create_token(subject: str, token_type: str, ttl: timedelta, **claims: Any) 
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> str:
+def create_session_token(user_id: uuid.UUID, role: str) -> str:
+    """The whole of the auth scheme: one token, set as one cookie, no refresh.
+
+    ``role`` is informational — every guard reads ``user.role`` from the row it
+    just loaded, never the claim, so a role change does not need a new token.
+    """
     return _create_token(
         str(user_id),
         ACCESS_TOKEN,
-        timedelta(minutes=settings.access_token_ttl_minutes),
+        timedelta(days=settings.session_ttl_days),
         role=role,
-    )
-
-
-def create_refresh_token(user_id: uuid.UUID) -> str:
-    return _create_token(
-        str(user_id),
-        REFRESH_TOKEN,
-        timedelta(days=settings.refresh_token_ttl_days),
     )
 
 

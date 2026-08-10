@@ -9,24 +9,39 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, Timestamped, UUIDPrimaryKey
 from app.models.enums import BookingStatus
-from app.models.session import Session
+from app.models.session import OneOnOneSession, Session
 from app.models.types import pg_enum
 from app.models.user import User
 
 
 class Booking(Base, UUIDPrimaryKey, Timestamped):
+    """A learner's place in something, group or one-to-one.
+
+    Exactly one of ``session_id`` / ``one_on_one_id`` is set — the database
+    checks it. Both kinds stay in this one table deliberately: it is
+    ``ex_bookings_learner_no_overlap``, and it can only stop a learner being in
+    two places at once if every place they can be is a row here.
+    """
+
     __tablename__ = "bookings"
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="ends_after_starts"),
         CheckConstraint("credits_spent >= 0", name="credits_non_negative"),
+        CheckConstraint(
+            "num_nonnulls(session_id, one_on_one_id) = 1", name="exactly_one_parent"
+        ),
         # Uniqueness per learner and the learner-overlap exclusion live in the
         # migration — both are partial and Alembic can't infer them.
     )
 
-    session_id: Mapped[uuid.UUID] = mapped_column(
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("sessions.id", ondelete="CASCADE"),
-        nullable=False,
+        index=True,
+    )
+    one_on_one_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("one_on_one_sessions.id", ondelete="CASCADE"),
         index=True,
     )
     learner_id: Mapped[uuid.UUID] = mapped_column(
@@ -58,11 +73,27 @@ class Booking(Base, UUIDPrimaryKey, Timestamped):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancellation_reason: Mapped[str | None] = mapped_column(Text)
 
-    session: Mapped[Session] = relationship(back_populates="bookings")
+    session: Mapped[Session | None] = relationship(
+        back_populates="bookings", foreign_keys=[session_id]
+    )
+    one_on_one: Mapped[OneOnOneSession | None] = relationship(
+        back_populates="bookings", foreign_keys=[one_on_one_id]
+    )
     learner: Mapped[User] = relationship(foreign_keys=[learner_id])
 
     def __str__(self) -> str:
         return f"{self.status.value} · {self.starts_at:%d %b %H:%M} UTC"
+
+    @property
+    def parent_id(self) -> uuid.UUID:
+        """The id of whichever session this books — the CHECK guarantees one."""
+        parent = self.session_id or self.one_on_one_id
+        assert parent is not None  # noqa: S101 — ck_bookings_exactly_one_parent
+        return parent
+
+    @property
+    def is_one_on_one(self) -> bool:
+        return self.one_on_one_id is not None
 
 
 class JoinAccessLog(Base, UUIDPrimaryKey):
@@ -70,12 +101,20 @@ class JoinAccessLog(Base, UUIDPrimaryKey):
     so we keep an audit trail — it's also the raw material for attendance."""
 
     __tablename__ = "join_access_logs"
+    __table_args__ = (
+        CheckConstraint(
+            "num_nonnulls(session_id, one_on_one_id) = 1", name="exactly_one_parent"
+        ),
+    )
 
     booking_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("bookings.id", ondelete="SET NULL"), index=True
     )
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("sessions.id", ondelete="CASCADE")
+    )
+    one_on_one_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("one_on_one_sessions.id", ondelete="CASCADE")
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")

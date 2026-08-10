@@ -72,14 +72,7 @@ export function RosterPanel({
             <Card key={entry.booking_id}>
               <CardContent className="flex flex-wrap items-center justify-between gap-4 text-sm">
                 <div className="min-w-56">
-                  <p className="font-medium">
-                    {entry.name}
-                    {entry.level && (
-                      <Badge variant="secondary" className="ml-2">
-                        {entry.level}
-                      </Badge>
-                    )}
-                  </p>
+                  <p className="font-medium">{entry.name}</p>
                   <p className="text-muted-foreground mt-1">
                     {/* The instructor's roster arrives without addresses at all;
                         `hideEmails` only stops an empty separator showing. */}

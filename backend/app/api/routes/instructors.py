@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -26,10 +26,17 @@ from app.models.booking import Booking
 from app.models.enums import UserRole
 from app.models.session import Session
 from app.models.user import GoogleCredential, User
-from app.schemas.common import InstructorOut, Message, SlotOut
+from app.schemas.common import (
+    AvailabilityOut,
+    AvailabilitySummaryOut,
+    DayAvailabilityOut,
+    InstructorOut,
+    Message,
+    SlotOut,
+)
 from app.schemas.session import BlockIn, BlockOut, SessionAdminOut
 from app.services import booking as booking_service
-from app.services import scheduling, session_admin
+from app.services import scheduling, session_admin, site_settings
 from app.services.errors import NotFound, PermissionDenied
 from app.services.scheduling import utc_now
 
@@ -47,6 +54,81 @@ async def list_instructors(db: DbSession) -> list[InstructorOut]:
         .order_by(User.full_name)
     )
     return [InstructorOut.model_validate(u) for u in result.scalars().all()]
+
+
+@router.get("/availability", response_model=AvailabilityOut)
+async def one_on_one_availability(
+    db: DbSession,
+    start: Annotated[date | None, Query(alias="from")] = None,
+    days: Annotated[int, Query(ge=1, le=62)] = 31,
+    duration_minutes: Annotated[int | None, Query(ge=15, le=240)] = None,
+) -> AvailabilityOut:
+    """Open one-to-one times across every active instructor, a month at a time.
+
+    Public, and deliberately anonymous: it says when somebody can teach, never
+    who. A learner picks an hour and the instructor is assigned when the booking
+    is made, so naming one here would be a promise this API cannot keep.
+
+    A whole range comes back in one response because the calendar needs to know
+    which dates are bookable before any of them is clicked — asking per day
+    would be thirty requests to grey out the empty ones.
+    """
+    today = datetime.now(UTC).astimezone(settings.tz).date()
+    first = max(start or today, today)
+    duration = duration_minutes or settings.one_on_one_slot_minutes
+
+    # Switched off means there are no open times, not an error: the calendar
+    # renders every date greyed out and the page explains itself, which is the
+    # same shape it already has for a fully-booked month.
+    if not await site_settings.is_enabled(db, "one_on_one_enabled"):
+        return AvailabilityOut(
+            timezone=settings.booking_timezone, duration_minutes=duration, days=[]
+        )
+
+    by_day = await scheduling.open_slots(
+        db,
+        first,
+        first + timedelta(days=days - 1),
+        duration_minutes=duration,
+    )
+    return AvailabilityOut(
+        timezone=settings.booking_timezone,
+        duration_minutes=duration,
+        days=[
+            DayAvailabilityOut(date=day, slots=slots) for day, slots in sorted(by_day.items())
+        ],
+    )
+
+
+@router.get("/availability/summary", response_model=AvailabilitySummaryOut)
+async def one_on_one_availability_summary(
+    db: DbSession,
+    days: Annotated[int, Query(ge=1, le=62)] = 31,
+) -> AvailabilitySummaryOut:
+    """Is one-to-one bookable at all in the next ``days``?
+
+    The site header calls this on every page load to decide whether to offer
+    1:1 in the nav, so it stops at the first open slot rather than costing out
+    the range. Public, and anonymous for the same reason
+    ``/availability`` is: it says *when*, never *who*.
+
+    A ``false`` here hides the link; it does not take the page away. Anyone
+    arriving from an old link, an email or a bookmark still gets ``/one-on-one``
+    and an explanation.
+
+    ``one_on_one_enabled`` short-circuits it to ``false``. The two answers are
+    the same to a reader — there is nothing to book — and collapsing them here
+    means a client that only knows about availability still gets the flag's
+    effect for free.
+    """
+    if not await site_settings.is_enabled(db, "one_on_one_enabled"):
+        return AvailabilitySummaryOut(has_slots=False, next_slot=None, horizon_days=days)
+
+    today = datetime.now(UTC).astimezone(settings.tz).date()
+    slot = await scheduling.first_open_slot(db, today, today + timedelta(days=days - 1))
+    return AvailabilitySummaryOut(
+        has_slots=slot is not None, next_slot=slot, horizon_days=days
+    )
 
 
 @router.get("/{instructor_id}/slots", response_model=list[SlotOut])

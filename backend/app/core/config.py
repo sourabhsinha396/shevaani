@@ -25,8 +25,13 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
-    access_token_ttl_minutes: int = 30
-    refresh_token_ttl_days: int = 30
+    #: How long a sign-in lasts. One long-lived session token, no refresh flow:
+    #: the thing a short TTL usually buys you — bounded damage from a leaked
+    #: token — is already covered, because ``api.deps.get_current_user`` reloads
+    #: the user from the database on every request. Deactivating an account or
+    #: changing a password takes effect on the next request either way, so a
+    #: short TTL was only costing learners their session.
+    session_ttl_days: int = 30
     token_encryption_key: str = ""
     #: Reset links are short-lived on purpose — they arrive by email, which is
     #: the weakest link in the chain.
@@ -38,6 +43,21 @@ class Settings(BaseSettings):
     one_on_one_window_end: time = time(19, 0)
     one_on_one_buffer_minutes: int = 60
     one_on_one_slot_minutes: int = 60
+    #: What one session costs. Group and one-to-one are priced the same on
+    #: purpose — a learner choosing between them should be choosing a format,
+    #: not a price. A single session may still override it (``price_credits``
+    #: on the row); this is only the default every path starts from.
+    #:
+    #: Internal note, not published anywhere: a credit is worth roughly ₹100 to
+    #: us, so a session is ~₹200. Pack prices are set against that anchor — see
+    #: ``ppp_multipliers`` and the seed in ``app/cli.py`` — and moving this
+    #: number without re-checking them changes the real price of a session.
+    session_price_credits: int = 2
+    #: Credits given once, at registration. Deliberately less than the price of
+    #: a session: it is a discount on the first booking, not a free one, so the
+    #: account starts with something on it without giving the service away to
+    #: anyone who can create an email address. Set to 0 to turn it off.
+    signup_bonus_credits: int = 1
     booking_hold_minutes: int = 10
     group_autocancel_hours_before: int = 2
     #: Cancel more than this many hours before the start for a full credit refund.
@@ -49,6 +69,21 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/v1/instructors/google/callback"
+
+    # Pricing
+    #: The currencies checkout is offered in. USD is the base price list and the
+    #: floor everything falls back to, so it is always included whether or not
+    #: it is listed here.
+    supported_currencies: list[str] = ["USD", "INR", "EUR", "GBP", "AUD"]
+    #: Units of the currency per 1 USD. Static, and edited by hand on purpose —
+    #: a price that tracks the spot rate charges a different amount than the page
+    #: the buyer read ten minutes ago.
+    fx_static_rates: dict[str, float] = {"INR": 88.0, "EUR": 0.86, "GBP": 0.74, "AUD": 1.52}
+    #: Purchasing power parity: the fraction of the converted price a market is
+    #: actually charged. A straight conversion prices Shevaani out of India.
+    ppp_multipliers: dict[str, float] = {"INR": 0.65}
+    #: Charm rounding, in major units. Nothing sells at ₹1,658.
+    currency_round_steps: dict[str, int] = {"INR": 10}
 
     # Payments
     stripe_secret_key: str = ""

@@ -5,10 +5,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.config import settings
 from app.models.enums import (
     BlockReason,
     BookingStatus,
-    CEFRLevel,
     MeetingStatus,
     SessionKind,
     SessionStatus,
@@ -19,8 +19,8 @@ from app.schemas.common import InstructorOut, ORMModel
 class SessionOut(ORMModel):
     """Public catalogue shape.
 
-    Deliberately has no join_url — that is a bearer credential and is only ever
-    served by GET /sessions/{id}/join.
+    Deliberately has no join_url. A catalogue row is public, and the link is
+    only ever handed to somebody holding a booking — see ``BookingWithSessionOut``.
     """
 
     id: uuid.UUID
@@ -32,8 +32,6 @@ class SessionOut(ORMModel):
     topic: str | None
     description: str | None
     prep_material_url: str | None
-    level_min: CEFRLevel
-    level_max: CEFRLevel
     starts_at: datetime
     ends_at: datetime
     min_seats: int
@@ -67,9 +65,11 @@ class GroupSessionCreateIn(BaseModel):
     duration_minutes: int = Field(default=60, ge=15, le=240)
     min_seats: int = Field(default=3, ge=1, le=50)
     max_seats: int = Field(default=6, ge=1, le=50)
-    price_credits: int = Field(default=1, ge=0, le=100)
-    level_min: CEFRLevel = CEFRLevel.A2
-    level_max: CEFRLevel = CEFRLevel.C1
+    #: Omitted by the admin form in the normal case, which is what makes
+    #: SESSION_PRICE_CREDITS the single lever over what a session costs.
+    price_credits: int = Field(
+        default_factory=lambda: settings.session_price_credits, ge=0, le=100
+    )
     publish: bool = False
 
     @model_validator(mode="after")
@@ -89,8 +89,6 @@ class GroupSessionUpdateIn(BaseModel):
     min_seats: int | None = Field(default=None, ge=1, le=50)
     max_seats: int | None = Field(default=None, ge=1, le=50)
     price_credits: int | None = Field(default=None, ge=0, le=100)
-    level_min: CEFRLevel | None = None
-    level_max: CEFRLevel | None = None
 
 
 class RescheduleIn(BaseModel):

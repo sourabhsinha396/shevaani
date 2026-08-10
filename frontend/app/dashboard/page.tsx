@@ -4,32 +4,39 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  BookOpen,
   CalendarClock,
-  Coins,
+  Check,
+  Copy,
   Loader2,
   MailWarning,
+  Ticket,
   Users,
   Video,
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { useSiteConfig } from "@/components/site-config-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
+import { sessionBalanceLabel, sessionDeltaLabel } from "@/lib/pricing";
 import type { BookingWithSession, LedgerEntry } from "@/lib/types";
 import { durationMinutes, formatDateTime, relativeToNow } from "@/lib/utils";
 
-/** Matches JOIN_WINDOW_BEFORE_MINUTES on the API. */
-const JOIN_OPENS_MINUTES_BEFORE = 15;
+/** Matches JOIN_WINDOW_BEFORE_MINUTES on the API. Nothing is gated on it any
+ *  more — it is only how long before the hour the instructor is expected. */
+const STARTING_SOON_MINUTES = 15;
 
 const LEDGER_LABEL: Record<string, string> = {
-  purchase: "Credits purchased",
+  purchase: "Sessions bought",
   booking_spend: "Booked a session",
-  booking_refund: "Cancelled in time — refunded",
-  session_cancelled: "Session cancelled — refunded",
+  booking_refund: "Cancelled in time — returned",
+  session_cancelled: "Session cancelled — returned",
   admin_grant: "Granted by Shevaani",
   admin_revoke: "Adjusted by Shevaani",
+  signup_bonus: "Welcome bonus",
 };
 
 function isOneOnOne(booking: BookingWithSession) {
@@ -83,6 +90,73 @@ function VerifyBanner() {
   );
 }
 
+/** The link itself, in full, plus the one thing people worry about when they
+ *  get it days early: that arriving before the instructor means nothing is
+ *  wrong. Shown rather than fetched — see the note on `recordJoin`. */
+function JoinPanel({
+  joinUrl,
+  instructorName,
+  onJoin,
+}: {
+  joinUrl: string;
+  instructorName: string;
+  onJoin: () => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  function copy() {
+    void navigator.clipboard.writeText(joinUrl).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="border-border/60 bg-surface-subtle rounded-lg border p-4">
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <Video className="size-4" /> Your Google Meet link
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <a
+          href={joinUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onJoin}
+          className="text-brand-ink min-w-0 flex-1 font-mono text-sm break-all underline underline-offset-4"
+        >
+          {joinUrl}
+        </a>
+        <Button variant="outline" size="sm" onClick={copy}>
+          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+
+      <p className="text-muted-foreground mt-3 text-sm text-pretty">
+        Open it whenever you like — it is the same link every time. Arrive early
+        and you&apos;ll wait in a short lobby: the room only opens once{" "}
+        {instructorName} is there.
+      </p>
+
+      <Button variant="brand" size="sm" className="mt-3" asChild>
+        <a href={joinUrl} target="_blank" rel="noopener noreferrer" onClick={onJoin}>
+          <Video className="size-4" /> Join
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+/** Why there is no link yet. "Still being made" and "we failed to make it" are
+ *  different things to tell someone, and only one of them is worth waiting on. */
+function missingLinkNotice(booking: BookingWithSession) {
+  if (booking.meeting_status === "failed") {
+    return "We couldn't set up the video room for this one. We know, and we're fixing it — if the link still isn't here the day before, write to us and we'll sort it out.";
+  }
+  return "The Meet link is being created — it usually lands within a minute of booking. Refresh this page and it should be here.";
+}
+
 function BookingCard({
   booking,
   timezone,
@@ -94,26 +168,20 @@ function BookingCard({
   booking: BookingWithSession;
   timezone?: string;
   busy: string | null;
-  onJoin: (sessionId: string) => void;
+  onJoin: (booking: BookingWithSession) => void;
   onCancel: (booking: BookingWithSession) => void;
   past?: boolean;
 }) {
+  const session = booking.session;
   const waitlisted = booking.status === "waitlisted";
   const startsAt = new Date(booking.starts_at).getTime();
-  // The endpoint is the real gate; this only decides whether the button looks
-  // live, so an out-of-window click still fails cleanly on the server.
-  const joinOpen =
-    !waitlisted &&
-    !past &&
-    Date.now() >= startsAt - JOIN_OPENS_MINUTES_BEFORE * 60_000;
+  const startingSoon =
+    !waitlisted && !past && Date.now() >= startsAt - STARTING_SOON_MINUTES * 60_000;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">
-            {booking.session.level_min}–{booking.session.level_max}
-          </Badge>
           {isOneOnOne(booking) ? (
             <Badge variant="secondary">One-to-one</Badge>
           ) : (
@@ -126,32 +194,32 @@ function BookingCard({
               Waitlist{booking.waitlist_position ? ` #${booking.waitlist_position}` : ""}
             </Badge>
           )}
-          {joinOpen && <Badge variant="success">Room open</Badge>}
+          {startingSoon && <Badge variant="success">Starting soon</Badge>}
           {past && booking.status === "attended" && <Badge variant="success">Attended</Badge>}
           {past && booking.status === "no_show" && <Badge variant="outline">Missed</Badge>}
         </div>
-        <CardTitle className="text-lg">{booking.session.title}</CardTitle>
+        <CardTitle className="text-lg">{session.title}</CardTitle>
       </CardHeader>
 
-      <CardContent className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-muted-foreground text-sm">
-          <p className="text-foreground font-medium">
-            {formatDateTime(booking.starts_at, timezone)}
-          </p>
-          <p className="mt-1">
-            {durationMinutes(booking.starts_at, booking.ends_at)} min
-            {!past && ` · ${relativeToNow(booking.starts_at)}`} · with{" "}
-            {booking.session.instructor.full_name}
-          </p>
-          {waitlisted && (
-            <p className="mt-1">
-              No credit taken yet — you&apos;re charged only if a seat opens.
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="text-muted-foreground text-sm">
+            <p className="text-foreground font-medium">
+              {formatDateTime(booking.starts_at, timezone)}
             </p>
-          )}
-        </div>
+            <p className="mt-1">
+              {durationMinutes(booking.starts_at, booking.ends_at)} min
+              {!past && ` · ${relativeToNow(booking.starts_at)}`} · with{" "}
+              {session.instructor.full_name}
+            </p>
+            {waitlisted && (
+              <p className="mt-1">
+                Nothing taken yet — you&apos;re charged only if a seat opens.
+              </p>
+            )}
+          </div>
 
-        {!past && (
-          <div className="flex gap-2">
+          {!past && (
             <Button
               variant="ghost"
               size="sm"
@@ -160,28 +228,33 @@ function BookingCard({
             >
               Cancel
             </Button>
-            {!waitlisted && (
-              <Button
-                size="sm"
-                variant={joinOpen ? "brand" : "outline"}
-                disabled={busy === booking.session_id || !joinOpen}
-                title={
-                  joinOpen
-                    ? undefined
-                    : `The room opens ${JOIN_OPENS_MINUTES_BEFORE} minutes before the start.`
-                }
-                onClick={() => onJoin(booking.session_id)}
-              >
-                {busy === booking.session_id ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Video className="size-4" />
-                )}
-                Join
-              </Button>
-            )}
-          </div>
+          )}
+        </div>
+
+        {!past && session.prep_material_url && (
+          <a
+            href={session.prep_material_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-ink inline-flex items-center gap-2 text-sm underline underline-offset-4"
+          >
+            <BookOpen className="size-4" /> Read the prep material first
+          </a>
         )}
+
+        {!past &&
+          !waitlisted &&
+          (booking.join_url ? (
+            <JoinPanel
+              joinUrl={booking.join_url}
+              instructorName={session.instructor.full_name}
+              onJoin={() => onJoin(booking)}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm text-pretty">
+              {missingLinkNotice(booking)}
+            </p>
+          ))}
       </CardContent>
     </Card>
   );
@@ -212,14 +285,14 @@ function CancelConfirm({
             {booking.credits_spent === 0
               ? "You haven't been charged for this — leaving the waitlist costs nothing."
               : refunded
-                ? `It starts in over 12 hours, so your ${booking.credits_spent} credit(s) go straight back to your balance.`
-                : `It starts in under 12 hours, so the ${booking.credits_spent} credit(s) will not come back. The seat was held for you and the group is small.`}
+                ? "It starts in over 12 hours, so it goes straight back on your balance."
+                : "It starts in under 12 hours, so it will not come back. The seat was held for you and the group is small."}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="destructive" size="sm" disabled={busy} onClick={onConfirm}>
             {busy && <Loader2 className="size-4 animate-spin" />}
-            {refunded ? "Cancel and refund" : "Cancel anyway"}
+            {refunded ? "Cancel and get it back" : "Cancel anyway"}
           </Button>
           <Button variant="ghost" size="sm" onClick={onDismiss}>
             Keep it
@@ -232,6 +305,7 @@ function CancelConfirm({
 
 export default function DashboardPage() {
   const { user, credits, loading: authLoading, refresh } = useAuth();
+  const { one_on_one_enabled: oneOnOneEnabled } = useSiteConfig();
   const router = useRouter();
 
   const [upcoming, setUpcoming] = React.useState<BookingWithSession[]>([]);
@@ -274,19 +348,13 @@ export default function DashboardPage() {
     if (user) void load();
   }, [user, load]);
 
-  async function join(sessionId: string) {
-    setBusy(sessionId);
-    setError(null);
-    try {
-      // Fetched on click, never embedded in the page: the URL is a bearer
-      // credential and every request for one is logged against the booking.
-      const info = await api.joinSession(sessionId);
-      window.open(info.join_url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      setError((e as ApiError).message);
-    } finally {
-      setBusy(null);
-    }
+  /** The link is already opening by the time this runs — the anchor did that,
+   *  and it has to, or the browser would treat a post-fetch `window.open` as a
+   *  popup. All this does is tell the API that somebody went, which is what
+   *  writes the audit row and the automatic attendance signal. A failure here
+   *  costs the learner nothing, so it is never shown to them. */
+  function recordJoin(booking: BookingWithSession) {
+    void api.joinSession(booking.session_id).catch(() => undefined);
   }
 
   async function cancel(booking: BookingWithSession) {
@@ -319,15 +387,14 @@ export default function DashboardPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl tracking-tight">My sessions</h1>
-          <p className="text-muted-foreground mt-2">
-            Everything you have coming up, in {user?.timezone}. The room opens{" "}
-            {JOIN_OPENS_MINUTES_BEFORE} minutes before the start.
+          <p className="text-muted-foreground mt-2 max-w-xl text-pretty">
+            Your upcoming sessions, your past sessions, and the full history of your balance.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
-            <Coins className="size-3.5" />
-            {credits} credits
+            <Ticket className="size-3.5" />
+            {sessionBalanceLabel(credits)} left
           </Badge>
           <Button asChild size="sm" variant="outline">
             <Link href="/checkout">Buy more</Link>
@@ -348,9 +415,12 @@ export default function DashboardPage() {
               <Button asChild variant="brand">
                 <Link href="/discussions">Browse discussions</Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link href="/one-on-one">Book a 1:1</Link>
-              </Button>
+              {/* Same rule as the nav: don't offer what is switched off. */}
+              {oneOnOneEnabled && (
+                <Button asChild variant="outline">
+                  <Link href="/one-on-one">Book a 1:1</Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -362,7 +432,7 @@ export default function DashboardPage() {
                 booking={booking}
                 timezone={user?.timezone}
                 busy={busy}
-                onJoin={join}
+                onJoin={recordJoin}
                 onCancel={setCancelling}
               />
               {cancelling?.id === booking.id && (
@@ -383,7 +453,7 @@ export default function DashboardPage() {
           <h2 className="text-xl tracking-tight">On the waitlist</h2>
           <p className="text-muted-foreground mt-1 text-sm text-pretty">
             You move up automatically when someone cancels, and only then is a
-            credit taken.
+            session taken from your balance.
           </p>
           <div className="mt-4 flex flex-col gap-4">
             {waitlisted.map((booking) => (
@@ -392,7 +462,7 @@ export default function DashboardPage() {
                   booking={booking}
                   timezone={user?.timezone}
                   busy={busy}
-                  onJoin={join}
+                  onJoin={recordJoin}
                   onCancel={setCancelling}
                 />
                 {cancelling?.id === booking.id && (
@@ -410,16 +480,16 @@ export default function DashboardPage() {
       )}
 
       <section className="mt-12">
-        <h2 className="text-xl tracking-tight">Credits</h2>
+        <h2 className="text-xl tracking-tight">Your balance</h2>
         <p className="text-muted-foreground mt-1 text-sm text-pretty">
-          Your balance is the sum of everything below. Nothing is ever edited or
-          removed, so this is the full story of every credit.
+          The sum of everything below. Nothing is ever edited or removed, so
+          this is the full story of every session you have bought and spent.
         </p>
         <Card className="mt-4">
           <CardContent className="flex flex-col divide-y text-sm">
             {ledger.length === 0 && (
               <p className="text-muted-foreground py-6 text-center">
-                No credits yet.{" "}
+                Nothing here yet.{" "}
                 <Link href="/checkout" className="text-foreground underline underline-offset-4">
                   Buy some
                 </Link>
@@ -443,7 +513,7 @@ export default function DashboardPage() {
                     entry.delta > 0 ? "text-[var(--success)]" : "text-muted-foreground"
                   }
                 >
-                  {entry.delta > 0 ? `+${entry.delta}` : entry.delta}
+                  {sessionDeltaLabel(entry.delta)}
                 </span>
               </div>
             ))}
@@ -461,7 +531,7 @@ export default function DashboardPage() {
                 booking={booking}
                 timezone={user?.timezone}
                 busy={busy}
-                onJoin={join}
+                onJoin={recordJoin}
                 onCancel={setCancelling}
                 past
               />

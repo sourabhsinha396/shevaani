@@ -133,6 +133,12 @@ def backup_failed(*, error: str) -> str:
     return f":floppy_disk: Nightly database backup failed.\n> {error[:300]}"
 
 
+#: A$ rather than $ for AUD: this reads alongside USD amounts in the same
+#: channel, and two different currencies sharing one symbol is exactly the kind
+#: of ambiguity a money notification should not have.
+_SYMBOLS = {"INR": "₹", "USD": "$", "EUR": "€", "GBP": "£", "AUD": "A$"}
+
+
 def _money(amount_minor: int, currency: str) -> str:
-    symbol = {"INR": "₹", "USD": "$"}.get(currency.upper(), f"{currency.upper()} ")
+    symbol = _SYMBOLS.get(currency.upper(), f"{currency.upper()} ")
     return f"{symbol}{amount_minor / 100:,.2f}"

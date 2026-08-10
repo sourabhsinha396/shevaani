@@ -8,6 +8,7 @@ from app.models.booking import Booking, JoinAccessLog
 from app.models.contact import ContactMessage
 from app.models.notifications import SessionReminder
 from app.models.session import Session, SessionMeeting
+from app.models.settings import SiteSettings
 from app.models.user import GoogleCredential, User
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "Session",
     "SessionMeeting",
     "SessionReminder",
+    "SiteSettings",
     "User",
     "WebhookEvent",
 ]

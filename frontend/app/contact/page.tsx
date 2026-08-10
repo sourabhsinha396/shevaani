@@ -109,7 +109,7 @@ export default function ContactPage() {
                 <Input
                   required
                   maxLength={200}
-                  placeholder="Refund for Tuesday's discussion"
+                  placeholder="Credit for Tuesday's discussion"
                   value={form.subject}
                   onChange={(e) => update("subject", e.target.value)}
                 />
@@ -143,9 +143,10 @@ export default function ContactPage() {
       )}
 
       <p className="text-muted-foreground mt-8 text-sm text-pretty">
-        Cancelling or refunding a session yourself is usually faster — the rules
-        are on the <Link href="/refunds">refund policy</Link> page, and your
-        bookings are under <Link href="/dashboard">My sessions</Link>.
+        Cancelling a session yourself is usually faster, and the credits come
+        straight back — the rules are on the{" "}
+        <Link href="/refunds">cancellation policy</Link> page, and your bookings
+        are under <Link href="/dashboard">My sessions</Link>.
       </p>
     </div>
   );

@@ -11,9 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH as MIN_LENGTH } from "@/lib/passwords";
 import { formatDateTime } from "@/lib/utils";
-
-const MIN_LENGTH = 10;
 
 function EmailCard() {
   const { user, refresh } = useAuth();
@@ -57,7 +56,7 @@ function EmailCard() {
               {/* Say what it actually costs. Nothing is blocked, and claiming
                   otherwise to force the click would be a lie. */}
               <p className="text-muted-foreground mt-1 text-pretty">
-                Everything still works — booking, joining, credits. What an
+                Everything still works — booking, joining, your balance. What an
                 unconfirmed address risks is the reminders and joining links we
                 send you going nowhere.
               </p>
@@ -123,7 +122,7 @@ function PasswordCard() {
               onChange={(e) => setForm({ ...form, current: e.target.value })}
             />
           </Field>
-          <Field label="New password" hint={`At least ${MIN_LENGTH} characters.`}>
+          <Field label="New password" hint={PASSWORD_HINT}>
             <Input
               type="password"
               autoComplete="new-password"
@@ -193,7 +192,7 @@ export default function AccountPage() {
 
       <Card className="bg-muted/30">
         <CardContent className="text-muted-foreground text-sm text-pretty">
-          Your credit balance and its full history live on{" "}
+          Your session balance and its full history live on{" "}
           <Link href="/dashboard" className="text-foreground underline underline-offset-4">
             My sessions
           </Link>

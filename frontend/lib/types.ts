@@ -1,5 +1,3 @@
-export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
-
 export type UserRole = "learner" | "instructor" | "superuser";
 
 export type SessionStatus = "draft" | "published" | "cancelled" | "completed";
@@ -22,7 +20,6 @@ export interface User {
   timezone: string;
   /** Null while unconfirmed. Advisory only — nothing is blocked by it. */
   email_verified_at: string | null;
-  level: CEFRLevel | null;
   headline: string | null;
   bio: string | null;
 }
@@ -36,16 +33,35 @@ export interface CreditPack {
   slug: string;
   name: string;
   credits: number;
-  /** Paise or cents — never a float. Format it, don't do arithmetic on it. */
+  /** The base price, in US cents. Every entry in `prices` is quoted from it. */
+  usd_cents: number;
+  /** Minor units by currency code. Every supported currency is present, so
+   *  switching currency is a re-render rather than another request. */
+  prices: Record<string, number>;
+  /** The `prices` entry for the currency this request asked for. */
   amount_minor: number;
   currency: string;
 }
 
+export interface ProviderOption {
+  provider: PaymentProvider;
+  /** False means render it, but don't let it be pressed. */
+  available: boolean;
+  /** Why not, for the hint under a disabled button. Null when available. */
+  unavailable_reason: string | null;
+}
+
 export interface BillingProfile {
   currency: string;
+  /** The recommended method — the same as `providers[0]`. */
   provider: PaymentProvider;
   /** False while the provider's keys are missing or its adapter is a stub. */
   provider_ready: boolean;
+  /** Every method, recommended first. The order is the server's call: which
+   *  gateway suits a currency is a settlement question, not a layout one. */
+  providers: ProviderOption[];
+  /** What checkout will accept. The server's list, not the client's guess. */
+  supported_currencies: string[];
 }
 
 export interface CheckoutSession {
@@ -87,8 +103,6 @@ export interface DiscussionSession {
   topic: string | null;
   description: string | null;
   prep_material_url: string | null;
-  level_min: CEFRLevel;
-  level_max: CEFRLevel;
   starts_at: string;
   ends_at: string;
   min_seats: number;
@@ -111,6 +125,8 @@ export interface AdminSession extends DiscussionSession {
 
 export interface Booking {
   id: string;
+  /** Whatever was booked — a group discussion or a one-to-one. `session.kind`
+   *  says which; nothing else needs to know. */
   session_id: string;
   status: BookingStatus;
   starts_at: string;
@@ -121,11 +137,42 @@ export interface Booking {
 
 export interface BookingWithSession extends Booking {
   session: DiscussionSession;
+  /** The Meet link, served as soon as it exists rather than held back until the
+   *  hour — the room admits nobody before the instructor arrives. Null while
+   *  waitlisted, once the session is over, and until the link has been made. */
+  join_url: string | null;
+  /** Why `join_url` is null, when it is. */
+  meeting_status: MeetingStatus | null;
 }
 
 export interface Slot {
   starts_at: string;
   ends_at: string;
+}
+
+export interface DayAvailability {
+  /** A calendar date in the *booking* timezone, which is not necessarily the
+   *  date these instants fall on for the reader. Regroup before displaying. */
+  date: string;
+  /** Slot starts, UTC. Every one runs for the requested `duration_minutes`. */
+  slots: string[];
+}
+
+/** Open one-to-one times pooled across every instructor. Names nobody — the
+ *  instructor is assigned when the booking is made. */
+export interface Availability {
+  timezone: string;
+  duration_minutes: number;
+  days: DayAvailability[];
+}
+
+/** Whether one-to-one is bookable at all — the one question the site chrome
+ *  needs answered, without pulling down a month of slots to answer it. */
+export interface AvailabilitySummary {
+  has_slots: boolean;
+  /** Advisory: somebody may take it before the reader clicks. */
+  next_slot: string | null;
+  horizon_days: number;
 }
 
 export interface Block {
@@ -155,7 +202,6 @@ export interface RosterEntry {
   name: string;
   /** Null on the instructor's own roster — they get names, not contact details. */
   email: string | null;
-  level: CEFRLevel | null;
   status: BookingStatus;
   first_joined_at: string | null;
   attendance_confirmed_at: string | null;
@@ -183,7 +229,6 @@ export interface LearnerSummary {
   id: string;
   full_name: string;
   email: string;
-  level: CEFRLevel | null;
   is_active: boolean;
   timezone: string;
   created_at: string;
@@ -197,7 +242,8 @@ export type CreditReason =
   | "booking_refund"
   | "session_cancelled"
   | "admin_grant"
-  | "admin_revoke";
+  | "admin_revoke"
+  | "signup_bonus";
 
 export interface LedgerEntry {
   id: string;
@@ -244,4 +290,11 @@ export interface JoinInfo {
   session_id: string;
   starts_at: string;
   ends_at: string;
+}
+
+/** Which parts of the product are switched on. Mirrors `SiteConfigOut` on the
+ *  API, which is generated from the `site_settings` columns — a flag added
+ *  there is invisible here until it is added below too. */
+export interface SiteConfig {
+  one_on_one_enabled: boolean;
 }

@@ -7,17 +7,13 @@ import { useAuth } from "@/components/auth-provider";
 import { SessionCard } from "@/components/session-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import type { CEFRLevel, DiscussionSession } from "@/lib/types";
+import type { DiscussionSession } from "@/lib/types";
 import { formatDayLabel } from "@/lib/utils";
-
-const LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export default function DiscussionsPage() {
   const { user } = useAuth();
   const [sessions, setSessions] = React.useState<DiscussionSession[]>([]);
-  const [level, setLevel] = React.useState<CEFRLevel | "">("");
   const [hideFull, setHideFull] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -28,7 +24,6 @@ export default function DiscussionsPage() {
 
     api
       .listDiscussions({
-        level: level || undefined,
         include_full: !hideFull,
         limit: 60,
       })
@@ -44,7 +39,7 @@ export default function DiscussionsPage() {
     return () => {
       cancelled = true;
     };
-  }, [level, hideFull]);
+  }, [hideFull]);
 
   // Group by local day so the catalogue reads like a timetable, not a list.
   const byDay = React.useMemo(() => {
@@ -63,33 +58,13 @@ export default function DiscussionsPage() {
           <h1 className="text-3xl tracking-tight sm:text-4xl">Group discussions</h1>
           <p className="text-muted-foreground mt-2 max-w-lg text-pretty">
             Four to eight people, one instructor, forty-five minutes of actual
-            speaking. Pick a level band that fits you.
+            speaking. Pick a topic and a time that suit you.
           </p>
         </div>
-
-        <div className="flex items-end gap-3">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium" htmlFor="level">
-              Your level
-            </label>
-            <Select
-              id="level"
-              value={level}
-              onChange={(e) => setLevel(e.target.value as CEFRLevel | "")}
-              className="w-40"
-            >
-              <option value="">All levels</option>
-              {LEVELS.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Button variant={hideFull ? "default" : "outline"} onClick={() => setHideFull((v) => !v)}>
-            {hideFull ? "Showing open only" : "Hide full"}
-          </Button>
-        </div>
+{/* 
+        <Button variant={hideFull ? "default" : "outline"} onClick={() => setHideFull((v) => !v)}>
+          {hideFull ? "Showing open only" : "Hide full"}
+        </Button> */}
       </header>
 
       {loading ? (
@@ -105,10 +80,16 @@ export default function DiscussionsPage() {
         <Card className="mt-10">
           <CardContent className="text-muted-foreground flex flex-col items-center gap-3 py-16 text-center">
             <CalendarX2 className="size-8" />
-            <p>No discussions scheduled for this filter yet.</p>
-            <Button variant="outline" onClick={() => { setLevel(""); setHideFull(false); }}>
-              Clear filters
-            </Button>
+            <p>
+              {hideFull
+                ? "Nothing with a free seat right now."
+                : "No discussions scheduled yet."}
+            </p>
+            {hideFull && (
+              <Button variant="outline" onClick={() => setHideFull(false)}>
+                Show full ones too
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

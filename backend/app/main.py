@@ -15,6 +15,7 @@ from app.api.routes import (
     auth,
     billing,
     bookings,
+    config,
     contact,
     instructors,
     sessions,
@@ -92,6 +93,7 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(config.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(sessions.router, prefix=API_PREFIX)
 app.include_router(bookings.router, prefix=API_PREFIX)

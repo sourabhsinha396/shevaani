@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, Timestamped, UUIDPrimaryKey
-from app.models.enums import CEFRLevel, PaymentProvider, UserRole
+from app.models.enums import PaymentProvider, UserRole
 from app.models.types import pg_enum
 
 
@@ -24,11 +24,14 @@ class User(Base, UUIDPrimaryKey, Timestamped):
 
     #: IANA name, e.g. "Asia/Kolkata". Everything is stored UTC and rendered in this.
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Kolkata")
-    level: Mapped[CEFRLevel | None] = mapped_column(pg_enum(CEFRLevel, "cefr_level"))
 
-    #: ISO-3166 alpha-2, captured at signup. Decides Razorpay vs Stripe and stays
-    #: stable across purchases so a learner's checkout never changes under them.
+    #: ISO-3166 alpha-2, inferred by the browser at signup rather than asked for.
+    #: Kept for support and reporting, and as the fallback currency when a client
+    #: sends none — it no longer decides the gateway, because the currency the
+    #: browser detected does, and that survives a learner moving country.
     billing_country: Mapped[str | None] = mapped_column(String(2))
+    #: Set by support, never at signup: an override for the one account that has
+    #: to check out somewhere other than where its currency would send it.
     preferred_provider: Mapped[PaymentProvider | None] = mapped_column(
         pg_enum(PaymentProvider, "payment_provider")
     )

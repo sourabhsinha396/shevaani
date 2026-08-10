@@ -1,12 +1,13 @@
 import type {
   AdminInstructor,
   AdminSession,
+  Availability,
+  AvailabilitySummary,
   Block,
   BillingProfile,
   Booking,
   BookingWithSession,
   CancellationImpact,
-  CEFRLevel,
   CheckoutSession,
   ContactMessage,
   CreditPack,
@@ -17,7 +18,9 @@ import type {
   LearnerSummary,
   LedgerEntry,
   Payment,
+  PaymentProvider,
   Roster,
+  SiteConfig,
   Slot,
   User,
 } from "./types";
@@ -129,14 +132,10 @@ export const api = {
 
   // ---- catalogue
   listDiscussions: (params: {
-    level?: CEFRLevel;
     starts_before?: string;
     include_full?: boolean;
     limit?: number;
-  } = {}) =>
-    request<DiscussionSession[]>(
-      `/sessions${qs({ kind: "group", ...params })}`,
-    ),
+  } = {}) => request<DiscussionSession[]>(`/sessions${qs(params)}`),
 
   getSession: (id: string) => request<DiscussionSession>(`/sessions/${id}`),
 
@@ -145,10 +144,14 @@ export const api = {
       method: "POST",
     }),
 
-  /** Only resolves inside the join window, and only for a confirmed booking. */
+  /** Records that somebody actually went, and hands back the link. The link is
+   *  also on every booking from `myBookings`, so the dashboard opens that and
+   *  calls this only for the audit row and the attendance signal. Resolves for
+   *  a confirmed booking on either kind of session, until the session ends. */
   joinSession: (id: string) => request<JoinInfo>(`/sessions/${id}/join`),
 
   // ---- bookings
+  /** Both kinds, group and one-to-one, each carrying its Meet link. */
   myBookings: (upcoming = true) =>
     request<BookingWithSession[]>(`/bookings${qs({ upcoming })}`),
 
@@ -158,10 +161,12 @@ export const api = {
       body: JSON.stringify({ reason }),
     }),
 
+  /** No `instructor_id`: the server picks somebody free at that hour, at random,
+   *  and retries with the next candidate if the pick loses a race. */
   bookOneOnOne: (payload: {
-    instructor_id: string;
     starts_at: string;
     duration_minutes?: number;
+    instructor_id?: string;
   }) =>
     request<Booking>("/bookings/one-on-one", {
       method: "POST",
@@ -174,16 +179,39 @@ export const api = {
     request<LedgerEntry[]>(`/bookings/credits/ledger${qs({ limit })}`),
 
   // ---- billing
-  billingProfile: () => request<BillingProfile>("/billing/profile"),
+  /** `currency` is what the browser detected; the response echoes back what the
+   *  server actually resolved it to, which may be USD. */
+  billingProfile: (currency?: string) =>
+    request<BillingProfile>(`/billing/profile${qs({ currency })}`),
 
-  /** Packs the caller can buy, already narrowed to their billing currency. */
-  creditPacks: () => request<CreditPack[]>("/billing/packs"),
+  /** The price list. Public — no account needed, which is what lets `/pricing`
+   *  show real numbers instead of a hand-copied duplicate. Every pack carries
+   *  the full `prices` map, so `currency` only picks the convenience field. */
+  creditPacks: (currency?: string) =>
+    request<CreditPack[]>(`/billing/packs${qs({ currency })}`),
 
-  /** Opens an order. Grants nothing — only the webhook does that. */
-  startCheckout: (packId: string) =>
+  /** Opens an order. Grants nothing. The currency is a code and never an
+   *  amount: the server re-quotes the price itself. */
+  startCheckout: (packId: string, currency?: string, provider?: PaymentProvider) =>
     request<CheckoutSession>("/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ pack_id: packId }),
+      body: JSON.stringify({ pack_id: packId, currency, provider }),
+    }),
+
+  /** Asks the server to settle a payment against the provider. This is what
+   *  actually grants credits, so the return page calls it rather than polling
+   *  for a webhook to land. Idempotent — calling it twice grants once.
+   *
+   *  The Razorpay fields come from its modal and are omitted for Stripe, which
+   *  returns by redirect with nothing signed to pass on. Neither is trusted on
+   *  its own: the server re-fetches the order either way. */
+  verifyPayment: (
+    id: string,
+    payload: { razorpay_payment_id?: string; razorpay_signature?: string } = {},
+  ) =>
+    request<Payment>(`/billing/payments/${id}/verify`, {
+      method: "POST",
+      body: JSON.stringify(payload),
     }),
 
   payment: (id: string) => request<Payment>(`/billing/payments/${id}`),
@@ -192,6 +220,15 @@ export const api = {
 
   // ---- instructors
   listInstructors: () => request<Instructor[]>("/instructors"),
+
+  /** Open one-to-one times across the whole team, a month per request — the
+   *  calendar has to know which dates are bookable before one is clicked. */
+  availability: (params: { from?: string; days?: number; duration_minutes?: number } = {}) =>
+    request<Availability>(`/instructors/availability${qs(params)}`),
+
+  /** Is 1:1 bookable at all? Cheap enough for the header to ask on every load. */
+  availabilitySummary: (days?: number) =>
+    request<AvailabilitySummary>(`/instructors/availability/summary${qs({ days })}`),
 
   /** `date` is a local calendar date (YYYY-MM-DD) in the booking timezone. */
   slots: (instructorId: string, date: string, durationMinutes?: number) =>
@@ -319,6 +356,18 @@ export const api = {
     request<{ balance: number }>(`/admin/learners/${id}/credits`, {
       method: "POST",
       body: JSON.stringify({ delta, note }),
+    }),
+
+  /** Read fresh, not through the ISR cache the rest of the site sees — a
+   *  settings screen that is a minute behind reports your own save as having
+   *  not happened. See `lib/site-config.ts` for the cached read. */
+  adminSiteConfig: () => request<SiteConfig>("/admin/config"),
+
+  /** Partial: send only the switch that moved. */
+  adminUpdateSiteConfig: (payload: Partial<SiteConfig>) =>
+    request<SiteConfig>("/admin/config", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     }),
 
   adminContactMessages: (handled?: boolean) =>

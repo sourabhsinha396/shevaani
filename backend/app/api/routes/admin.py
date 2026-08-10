@@ -15,7 +15,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import DbSession, Superuser
-from app.api.serializers import build_session_admin_out, seat_counts, waitlist_counts
+from app.api.serializers import (
+    build_session_admin_out,
+    build_site_config,
+    seat_counts,
+    waitlist_counts,
+)
 from app.api.serializers import session_roster as roster_for
 from app.models.billing import CreditLedger
 from app.models.booking import Booking
@@ -50,8 +55,9 @@ from app.schemas.session import (
     RescheduleIn,
     SessionAdminOut,
 )
+from app.schemas.settings import SiteConfigIn, SiteConfigOut
 from app.services import booking as booking_service
-from app.services import credits, session_admin
+from app.services import credits, session_admin, site_settings
 from app.services.errors import Conflict, NotFound
 from app.services.scheduling import utc_now
 from app.workers import queue
@@ -142,8 +148,6 @@ async def create_group_session(
         min_seats=payload.min_seats,
         max_seats=payload.max_seats,
         price_credits=payload.price_credits,
-        level_min=payload.level_min,
-        level_max=payload.level_max,
         publish=payload.publish,
     )
     session_id = session.id
@@ -171,8 +175,6 @@ async def update_group_session(
         topic=payload.topic,
         description=payload.description,
         prep_material_url=payload.prep_material_url,
-        level_min=payload.level_min,
-        level_max=payload.level_max,
         min_seats=payload.min_seats,
         max_seats=payload.max_seats,
         price_credits=payload.price_credits,
@@ -279,7 +281,6 @@ async def _learner_summary(db: DbSession, user: User) -> LearnerSummaryOut:
         id=user.id,
         full_name=user.full_name,
         email=user.email,
-        level=user.level,
         is_active=user.is_active,
         timezone=user.timezone,
         created_at=user.created_at,
@@ -325,7 +326,9 @@ async def learner_detail(
 
     bookings = await db.execute(
         select(Booking)
-        .options(selectinload(Booking.session))
+        # Both parents: a booking hangs off exactly one of them, and a learner's
+        # history is the two kinds interleaved.
+        .options(selectinload(Booking.session), selectinload(Booking.one_on_one))
         .where(Booking.learner_id == learner_id)
         .order_by(Booking.starts_at.desc())
         .limit(100)
@@ -342,8 +345,8 @@ async def learner_detail(
         bookings=[
             LearnerBookingOut(
                 id=b.id,
-                session_id=b.session_id,
-                session_title=b.session.title,
+                session_id=b.parent_id,
+                session_title=(b.session or b.one_on_one).title,
                 status=b.status,
                 starts_at=b.starts_at,
                 ends_at=b.ends_at,
@@ -493,3 +496,32 @@ async def mark_contact_handled(
     message.handled_at = utc_now()
     message.handled_note = payload.note
     return Message(detail="Marked as handled.")
+
+
+# ------------------------------------------------------------ site config
+
+
+@router.get("/config", response_model=SiteConfigOut)
+async def read_site_config(db: DbSession, _: Superuser) -> SiteConfigOut:
+    """The same flags ``GET /config`` serves, read fresh.
+
+    The admin form deliberately does not reuse the public endpoint: that one is
+    read through the frontend's ISR cache and can be up to a minute behind, and
+    a settings screen showing a stale value is a settings screen that reports
+    your own save as not having happened.
+    """
+    return build_site_config(await site_settings.load(db))
+
+
+@router.patch("/config", response_model=SiteConfigOut)
+async def update_site_config(
+    payload: SiteConfigIn, db: DbSession, _: Superuser
+) -> SiteConfigOut:
+    """Flip one or more flags. Absent fields are left alone.
+
+    Partial rather than whole-object so two people editing different switches
+    cannot overwrite each other, and so a frontend that predates a newly added
+    flag cannot reset it by omission.
+    """
+    changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    return build_site_config(await site_settings.update(db, changes))

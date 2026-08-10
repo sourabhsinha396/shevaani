@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import {
   CalendarClock,
   FileText,
@@ -21,15 +22,18 @@ import { cn } from "@/lib/utils";
  * A mock of a live room, dressed as the video call it actually is. Everything
  * here is illustrative — the point is to show what "everyone gets airtime"
  * looks like as a number, since that is the claim the product is making.
- *
- * Four shares summing to 80% is not a coincidence: it is the same learner share
- * the talk-time calculator further down the page is built on.
  */
 const ROOM = [
-  { name: "Priya", country: "India", share: 21 },
-  { name: "Arjun", country: "India", share: 19 },
-  { name: "Mariana", country: "Brazil", share: 22 },
-  { name: "Yusuf", country: "Türkiye", share: 18 },
+  { name: "Shalini", photo: "/images/homepage-session/shalini.png", score: '91' },
+  { name: "Kundan", photo: "/images/homepage-session/kundan.png", score: '59' },
+  { name: "Divyanshu", photo: "/images/homepage-session/harsh.png", score: '63' },
+  {
+    name: "Sourabh",
+    photo: "/images/homepage-session/sourabh.jpeg",
+    score: '88',
+    // The only landscape shot of the four — centring it crops the face off.
+    position: "object-[70%_35%]",
+  },
 ];
 
 /**
@@ -40,8 +44,8 @@ const ROOM = [
 const TURNS = [0, 2, 1, 3, 2, 0, 3, 1];
 
 const AGENDA = [
-  { icon: FileText, label: "Prep read", value: "Sent 24h ahead" },
-  { icon: CalendarClock, label: "Runs for", value: "50 minutes" },
+  { icon: FileText, label: "Prep read", value: "We never tell to grill you" },
+  { icon: CalendarClock, label: "Runs for", value: "30 minutes approx" },
   { icon: Video, label: "Joins via", value: "Google Meet" },
 ];
 
@@ -63,16 +67,16 @@ export function SessionPreview() {
 
   return (
     <section className="section bg-surface-subtle">
-      <div className="container-page grid items-center gap-14 lg:grid-cols-2">
+      {/* The call window gets the wider column — the tiles are the argument,
+          so they get the room to be looked at. */}
+      <div className="container-page grid items-center gap-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <Reveal>
           <p className="eyebrow mb-5">Inside a discussion</p>
           <h2 className="text-4xl text-balance md:text-5xl">
-            Eight people, fifty minutes, everybody talks.
+            4-8 learners, ~30 minutes
           </h2>
           <p className="text-muted-foreground mt-5 text-pretty">
-            An instructor watches the room and pulls in whoever has gone quiet.
-            Nobody sits through someone else&apos;s lecture, and nobody dominates
-            — the split on each tile is what a normal session looks like.
+            An moderator gives a random topic without any prep, and you either speak or waste your turn. 
           </p>
 
           <dl className="mt-8 flex flex-col gap-4">
@@ -107,58 +111,67 @@ export function SessionPreview() {
                 <span className="bg-brand-ink relative size-2 rounded-full" />
               </span>
               <p className="text-sm font-medium">
-                Remote work: is the office over?
+                Will AI replace human jobs?
               </p>
               <Badge variant="outline" className="ml-auto">
-                B2–C1
+                30 min
               </Badge>
             </div>
 
             {/* Two by two, the way a four-person call actually tiles. Cameras
-                are off — initials rather than stock faces, because invented
-                photographs of learners would be a lie the layout doesn't
-                need. */}
-            <div className="grid grid-cols-2 gap-2 p-2 sm:gap-3 sm:p-3">
+                on: the photo is the tile, edge to edge, with the chrome laid
+                over it rather than beside it. */}
+            <div className="grid grid-cols-2 gap-1.5 p-1.5 sm:gap-2 sm:p-2">
               {ROOM.map((person, i) => {
                 const talking = i === speaker;
                 return (
                   <div
                     key={person.name}
                     className={cn(
-                      "bg-secondary/60 relative grid aspect-[4/3] place-items-center overflow-hidden rounded-lg ring-inset transition-all duration-300",
-                      talking
-                        ? "ring-brand bg-secondary ring-2"
-                        : "ring-border/60 ring-1",
+                      "bg-secondary relative aspect-[4/3] overflow-hidden rounded-lg ring-inset transition-all duration-300",
+                      talking ? "ring-brand ring-2" : "ring-border/60 ring-1",
                     )}
                   >
+                    <Image
+                      src={person.photo}
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 22vw, (min-width: 640px) 45vw, 48vw"
+                      className={cn(
+                        "object-cover transition-[filter,transform] duration-300",
+                        person.position ?? "object-center",
+                        // Whoever is quiet reads as background, so the eye
+                        // lands on the person holding the floor.
+                        talking ? "scale-[1.02]" : "brightness-90 saturate-75",
+                      )}
+                    />
+
+                    {/* Enough of a wash at top and bottom for the badge and
+                        the name plate to stay legible over any photograph. */}
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60"
+                    />
+
                     {/* Talk time, top right — the number that carries the
                         argument, so it stays on screen the whole time. */}
-                    <span
-                      className={cn(
-                        "bg-background/70 absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums backdrop-blur transition-colors",
-                        talking ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      {person.share}%
-                    </span>
-
-                    <span
-                      className={cn(
-                        "grid size-14 place-items-center rounded-full text-base font-medium transition-all duration-300",
-                        talking
-                          ? "bg-brand text-brand-foreground scale-105"
-                          : "bg-background text-foreground/80 border-border/60 border",
-                      )}
-                    >
-                      {person.name.slice(0, 2)}
+                    <span className="absolute top-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white tabular-nums backdrop-blur-sm">
+                      {person.score}%
                     </span>
 
                     {/* Name plate, bottom left, exactly where a call puts it. */}
-                    <span className="absolute bottom-2 left-2 flex items-center gap-1.5">
-                      <VoiceBars active={talking} bars={4} />
-                      <span className="text-xs font-medium">{person.name}</span>
-                      <span className="text-muted-foreground hidden text-[11px] sm:inline">
-                        · {person.country}
+                    <span className="absolute bottom-2 left-2 flex items-center gap-1.5 text-white">
+                      {/* The bars are inked for a light card; over a photo
+                          they have to go white to survive. */}
+                      <VoiceBars
+                        active={talking}
+                        bars={4}
+                        className={
+                          talking ? "[&>span]:bg-white" : "[&>span]:bg-white/50"
+                        }
+                      />
+                      <span className="text-xs font-medium drop-shadow">
+                        {person.name}
                       </span>
                     </span>
                   </div>
@@ -183,7 +196,7 @@ export function SessionPreview() {
 
               <p className="text-muted-foreground ml-auto flex items-center gap-2 text-xs">
                 <Users className="size-3.5" />
-                4 of 8 · facilitated by Anika
+                4 of 8 · instructor in the room
               </p>
             </div>
           </div>

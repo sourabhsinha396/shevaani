@@ -32,6 +32,11 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       aria-label="Toggle theme"
+      // Muted at rest, like an inactive nav link. Ghost inherits `foreground`,
+      // which put this icon at the same weight the header uses to mark the
+      // current section — loud for a control nobody navigates by. The variant
+      // already lifts it to full ink on hover.
+      className="text-muted-foreground"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
       {mounted && resolvedTheme === "dark" ? (

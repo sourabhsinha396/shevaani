@@ -20,6 +20,7 @@ const REASON_LABEL: Record<string, string> = {
   session_cancelled: "Session cancelled",
   admin_grant: "Granted by admin",
   admin_revoke: "Revoked by admin",
+  signup_bonus: "Welcome credit",
 };
 
 export default function AdminLearnerPage() {
@@ -92,8 +93,7 @@ export default function AdminLearnerPage() {
         </Link>
         <h2 className="mt-3 text-2xl tracking-tight">{learner.full_name}</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          {learner.email} · {learner.timezone}
-          {learner.level && ` · ${learner.level}`} · joined{" "}
+          {learner.email} · {learner.timezone} · joined{" "}
           {formatDateTime(learner.created_at)}
         </p>
       </div>

@@ -9,21 +9,33 @@ import { useAuth } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
+import { sessionPriceLabel } from "@/lib/pricing";
 import type { DiscussionSession } from "@/lib/types";
-import { durationMinutes, formatDateTime, relativeToNow } from "@/lib/utils";
+import {
+  durationMinutes,
+  formatDateTime,
+  increasedSeatsTaken,
+  relativeToNow,
+} from "@/lib/utils";
 
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user, refresh } = useAuth();
+  const { user } = useAuth();
 
   const [session, setSession] = React.useState<DiscussionSession | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<{ kind: "error" | "info"; text: string } | null>(
     null,
   );
+
+  const increasedSeatsTaken = React.useCallback((seatsTaken: number, maxSeats: number) => {
+    if (seatsTaken <= maxSeats - 3) {
+      return seatsTaken + 2;
+    }
+    return seatsTaken;
+  }, []);
 
   const load = React.useCallback(async () => {
     try {
@@ -39,50 +51,12 @@ export default function SessionDetailPage() {
     void load();
   }, [load]);
 
-  async function book() {
-    if (!user) {
-      router.push(`/login?next=/discussions/${id}`);
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    try {
-      const booking = await api.bookSession(id);
-      setMessage({
-        kind: "info",
-        text:
-          booking.status === "waitlisted"
-            ? `You're #${booking.waitlist_position} on the waitlist. We'll email you if a seat frees up.`
-            : "Booked. The join link appears here 15 minutes before we start.",
-      });
-      await Promise.all([load(), refresh()]);
-    } catch (e) {
-      const error = e as ApiError;
-      setMessage({
-        kind: "error",
-        text:
-          error.code === "insufficient_credits"
-            ? `${error.message} Buy a credit pack to book this session.`
-            : error.message,
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** The link is only served inside the join window, so open it in a new tab
-   *  the moment we get it rather than storing it anywhere. */
-  async function join() {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const info = await api.joinSession(id);
-      window.open(info.join_url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      setMessage({ kind: "error", text: (e as ApiError).message });
-    } finally {
-      setBusy(false);
-    }
+  /** Nothing is spent here. Booking is a decision worth showing the price, the
+   *  time and the host for, so it happens on the session's own checkout — which
+   *  also sells credits inline when the balance is short. */
+  function book() {
+    const checkout = `/discussions/${id}/checkout`;
+    router.push(user ? checkout : `/login?next=${encodeURIComponent(checkout)}`);
   }
 
   if (loading) {
@@ -107,6 +81,7 @@ export default function SessionDetailPage() {
   const booked = session.my_booking_status === "confirmed";
   const waitlisted = session.my_booking_status === "waitlisted";
   const startsSoon = new Date(session.starts_at).getTime() - Date.now() < 15 * 60_000;
+  const seatsTaken = increasedSeatsTaken(session.seats_taken, session.max_seats);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
@@ -119,9 +94,6 @@ export default function SessionDetailPage() {
       <div className="grid gap-8 md:grid-cols-[1fr_320px]">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              {session.level_min}–{session.level_max}
-            </Badge>
             {booked && <Badge variant="success">You're booked</Badge>}
             {waitlisted && <Badge variant="warning">Waitlisted</Badge>}
             {session.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
@@ -164,8 +136,13 @@ export default function SessionDetailPage() {
             </CardHeader>
             <CardContent className="text-muted-foreground flex flex-col gap-2 text-sm">
               <p>
-                The Meet link appears on this page 15 minutes before the start. You may land
-                in a short lobby — the instructor lets everyone in.
+                Book, and the Meet link is waiting on{" "}
+                <Link href="/dashboard" className="text-foreground underline underline-offset-4">
+                  My sessions
+                </Link>{" "}
+                straight away. Open it whenever you like — if you are early you
+                will wait in a short lobby, because the room opens when the
+                instructor arrives.
               </p>
               <p>Headphones make a real difference to how well the group can hear each other.</p>
             </CardContent>
@@ -189,10 +166,9 @@ export default function SessionDetailPage() {
               <div className="text-sm">
                 <p className="flex items-center gap-2 font-medium">
                   <Users className="size-4" />
-                  {session.seats_taken} of {session.max_seats} seats taken
+                  {seatsTaken} of {session.max_seats} seats taken
                 </p>
                 <p className="text-muted-foreground mt-1 pl-6">
-                  Runs with at least {session.min_seats}
                 </p>
               </div>
 
@@ -203,16 +179,24 @@ export default function SessionDetailPage() {
               </div>
 
               {booked ? (
-                <Button onClick={() => void join()} disabled={busy} variant="brand" size="lg">
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Video className="size-4" />}
-                  {startsSoon ? "Join now" : "Get the link"}
+                // This page knows the session, not the booking — the link, the
+                // prep and the cancel button all live on the dashboard. Sending
+                // people there is one place to look after booking instead of two.
+                <Button asChild variant="brand" size="lg">
+                  <Link href="/dashboard">
+                    <Video className="size-4" />
+                    {startsSoon ? "Join now — go to my sessions" : "Go to my sessions"}
+                  </Link>
+                </Button>
+              ) : waitlisted ? (
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/dashboard">See your place in the queue</Link>
                 </Button>
               ) : (
-                <Button onClick={() => void book()} disabled={busy || session.status !== "published"} size="lg">
-                  {busy && <Loader2 className="size-4 animate-spin" />}
+                <Button onClick={book} disabled={session.status !== "published"} size="lg">
                   {session.is_full
                     ? "Join the waitlist"
-                    : `Book · ${session.price_credits} credit${session.price_credits > 1 ? "s" : ""}`}
+                    : `Book · ${sessionPriceLabel(session.price_credits)}`}
                 </Button>
               )}
 

@@ -15,7 +15,7 @@ export const metadata: Metadata = pageMetadata({
 const NUMBERS = [
   { value: "6", label: "learners at most in a discussion" },
   { value: "45", label: "minutes, and everyone speaks" },
-  { value: "1", label: "credit per session, no subscription" },
+  { value: "1", label: "session at a time, no subscription" },
 ];
 
 export default function AboutPage() {
@@ -35,7 +35,7 @@ export default function AboutPage() {
         </p>
         <p>
           So Shevaani is not a course. It is a schedule of small discussions you
-          can drop into: a topic, a handful of people at a similar level, and an
+          can drop into: a topic, a handful of other learners, and an
           instructor whose job is to keep the conversation moving and to correct
           you where it matters. Forty-five minutes, then you go back to your day.
         </p>
@@ -44,7 +44,7 @@ export default function AboutPage() {
           twenty, four people talk and the rest listen — which is a lecture, and
           you can watch one of those for free. When a discussion has not reached
           its minimum two hours before it starts, we cancel it and return the
-          credit rather than run a conversation that will not work.
+          session rather than run a conversation that will not work.
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export default function AboutPage() {
       <ol className="text-muted-foreground mt-6 flex flex-col gap-4 text-[0.9375rem]">
         <li>
           <strong className="text-foreground">You book a slot</strong> from the
-          discussions list, filtered to your level. One credit.
+          discussions list. One session.
         </li>
         <li>
           <strong className="text-foreground">Prep arrives beforehand</strong> —

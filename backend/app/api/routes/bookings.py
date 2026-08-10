@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -9,12 +10,13 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
 from app.api.ratelimit import limiter
-from app.api.serializers import build_session_out, seat_counts
+from app.api.serializers import build_one_on_one_out, build_session_out, seat_counts
+from app.core.config import settings
 from app.core.ratelimit import BOOKING
 from app.models.billing import CreditLedger
 from app.models.booking import Booking
-from app.models.enums import BookingStatus
-from app.models.session import Session
+from app.models.enums import SEAT_HOLDING_STATUSES, BookingStatus, SessionStatus
+from app.models.session import OneOnOneSession, Session, SessionMeeting
 from app.schemas.booking import (
     BookingOut,
     BookingWithSessionOut,
@@ -32,12 +34,47 @@ from app.workers import queue
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
+def _join_url_for(
+    booking: Booking,
+    session: Session | OneOnOneSession,
+    meeting: SessionMeeting | None,
+    now: datetime,
+) -> str | None:
+    """The Meet link for the caller's own booking, or None if there isn't one yet.
+
+    How long there is until the session is deliberately *not* a condition. A
+    Meet room lets nobody in before its host arrives, so a link handed over
+    early opens onto a lobby and nothing else — holding it back until fifteen
+    minutes before the hour protected nothing and left the learner with a page
+    that could not answer "where do I go?".
+
+    What is still a condition: a seat (the waitlist has no room to enter), a
+    session that is still happening, a meeting the worker has actually made, and
+    an hour that has not already passed.
+    """
+    if booking.status not in SEAT_HOLDING_STATUSES:
+        return None
+    if session.status == SessionStatus.CANCELLED:
+        return None
+    if meeting is None or not meeting.is_ready:
+        return None
+    if now > booking.ends_at + timedelta(minutes=settings.join_window_after_minutes):
+        return None
+    return meeting.join_url
+
+
 @router.get("", response_model=list[BookingWithSessionOut])
 async def my_bookings(
     db: DbSession,
     user: CurrentUser,
     upcoming: Annotated[bool, Query()] = True,
 ) -> list[BookingWithSessionOut]:
+    """Everything the caller has booked, of both kinds, newest hour first.
+
+    Both parents are eager-loaded because a booking hangs off exactly one of
+    them and which one is per row — a lazy load here would be an N+1 on the
+    page a signed-in learner opens most.
+    """
     conditions = [
         Booking.learner_id == user.id,
         Booking.status != BookingStatus.CANCELLED,
@@ -47,28 +84,49 @@ async def my_bookings(
 
     result = await db.execute(
         select(Booking)
-        .options(selectinload(Booking.session).selectinload(Session.instructor))
+        .options(
+            selectinload(Booking.session).selectinload(Session.instructor),
+            selectinload(Booking.session).selectinload(Session.meeting),
+            selectinload(Booking.one_on_one).selectinload(OneOnOneSession.instructor),
+            selectinload(Booking.one_on_one).selectinload(OneOnOneSession.meeting),
+        )
         .where(*conditions)
         .order_by(Booking.starts_at)
     )
     bookings = list(result.scalars().all())
 
-    taken = await seat_counts(db, [b.session_id for b in bookings])
-    return [
-        BookingWithSessionOut(
-            id=b.id,
-            session_id=b.session_id,
-            status=b.status,
-            starts_at=b.starts_at,
-            ends_at=b.ends_at,
-            credits_spent=b.credits_spent,
-            waitlist_position=b.waitlist_position,
-            session=build_session_out(
+    now = utc_now()
+    taken = await seat_counts(db, [b.session_id for b in bookings if b.session_id])
+
+    out: list[BookingWithSessionOut] = []
+    for b in bookings:
+        if b.session is not None:
+            parent: Session | OneOnOneSession = b.session
+            session_out = build_session_out(
                 b.session, taken=taken.get(b.session_id, 0), my_status=b.status
-            ),
+            )
+        elif b.one_on_one is not None:
+            parent = b.one_on_one
+            session_out = build_one_on_one_out(b.one_on_one, my_status=b.status)
+        else:  # pragma: no cover — ck_bookings_exactly_one_parent forbids it
+            continue
+
+        meeting = parent.meeting
+        out.append(
+            BookingWithSessionOut(
+                id=b.id,
+                session_id=b.parent_id,
+                status=b.status,
+                starts_at=b.starts_at,
+                ends_at=b.ends_at,
+                credits_spent=b.credits_spent,
+                waitlist_position=b.waitlist_position,
+                session=session_out,
+                join_url=_join_url_for(b, parent, meeting, now),
+                meeting_status=meeting.status if meeting else None,
+            )
         )
-        for b in bookings
-    ]
+    return out
 
 
 @router.post(

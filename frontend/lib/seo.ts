@@ -11,8 +11,8 @@ import type { DiscussionSession } from "./types";
  * event, and the parts of it search engines legitimately want are the parts a
  * stranger deciding whether to book would want:
  *
- *   indexable — title, topic, description, CEFR band, start time, duration,
- *               price in credits
+ *   indexable — title, topic, description, start time, duration, price in
+ *               credits
  *   not       — instructor identity, seat counts, waitlist position, anything
  *               about who has booked, and above all the join URL
  *
@@ -135,13 +135,10 @@ export function discussionJsonLd(session: DiscussionSession) {
     },
     organizer: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
     // Credits, not currency. Marking this up as a money price would be a lie —
-    // the price of a session is one credit, and credits are bought separately.
+    // a session costs credits, and credits are bought separately.
     isAccessibleForFree: false,
     typicalAgeRange: "16-",
-    audience: {
-      "@type": "Audience",
-      audienceType: `English learners, CEFR ${session.level_min}–${session.level_max}`,
-    },
+    audience: { "@type": "Audience", audienceType: "English learners" },
   };
 }
 

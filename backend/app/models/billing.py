@@ -22,22 +22,27 @@ from app.models.types import pg_enum
 
 
 class CreditPack(Base, UUIDPrimaryKey, Timestamped):
-    """Priced per currency — we never convert at checkout. A ₹ price list and a
-    $ price list are separate rows."""
+    """One row per pack, priced in USD.
+
+    USD is the base list and the only price stored; INR, EUR, GBP and AUD are
+    quoted from it at read time by :mod:`app.services.pricing`. A payment records
+    its own ``amount_minor`` and ``currency``, so re-pricing a pack or moving an
+    exchange rate never rewrites what somebody was charged.
+    """
 
     __tablename__ = "credit_packs"
     __table_args__ = (
-        UniqueConstraint("slug", "currency", name="uq_credit_packs_slug_currency"),
+        UniqueConstraint("slug", name="uq_credit_packs_slug"),
         CheckConstraint("credits > 0", name="credits_positive"),
-        CheckConstraint("amount_minor > 0", name="amount_positive"),
+        CheckConstraint("usd_cents > 0", name="usd_cents_positive"),
     )
 
     slug: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     credits: Mapped[int] = mapped_column(Integer, nullable=False)
-    #: Paise or cents. Integer, always — never a float.
-    amount_minor: Mapped[int] = mapped_column(Integer, nullable=False)
-    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    #: US cents. Integer, always — never a float, and never a minor unit of some
+    #: other currency: the whole conversion depends on knowing what this is.
+    usd_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
 
 

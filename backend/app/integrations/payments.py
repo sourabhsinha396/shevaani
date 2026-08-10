@@ -40,6 +40,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -57,6 +58,23 @@ logger = logging.getLogger(__name__)
 
 STRIPE_CHECKOUT_SESSIONS = "https://api.stripe.com/v1/checkout/sessions"
 RAZORPAY_ORDERS = "https://api.razorpay.com/v1/orders"
+
+
+def _sessions_label(credits: int) -> str:
+    """A pack's size in sessions — the unit every buying screen speaks in.
+
+    Credits are the ledger's unit and belong in the ledger. The provider's own
+    payment page is the last place a buyer should have to divide by two in their
+    head, and it is the one screen we do not control the rest of, so what we hand
+    it has to already be in the right unit.
+
+    Rounds up, for the same reason ``sessionPriceLabel`` does in
+    ``frontend/lib/pricing.ts``: a pack short of a whole session must not read as
+    nothing. Every seeded pack is an even number of credits, so this only matters
+    for one adjusted by hand.
+    """
+    sessions = max(1, math.ceil(credits / settings.session_price_credits))
+    return f"{sessions} session" if sessions == 1 else f"{sessions} sessions"
 
 _TIMEOUT = httpx.Timeout(20.0, connect=5.0)
 
@@ -100,6 +118,23 @@ class CheckoutSession:
     client_payload: dict[str, object] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class GatewayStatus:
+    """What the provider says about one order, asked for rather than pushed.
+
+    ``amount_minor``/``currency`` echo what was actually captured, so the caller
+    can cross-check its own row instead of trusting ``paid`` on its own — the
+    same defence :func:`app.services.billing.handle_webhook` applies to events.
+    ``None`` means the provider did not say, not that it matched.
+    """
+
+    paid: bool
+    expired: bool = False
+    amount_minor: int | None = None
+    currency: str | None = None
+    provider_payment_id: str | None = None
+
+
 class PaymentAdapter(Protocol):
     name: ProviderName
 
@@ -111,11 +146,37 @@ class PaymentAdapter(Protocol):
         *,
         payment_id: uuid.UUID,
         pack: CreditPack,
+        amount_minor: int,
+        currency: str,
         user: User,
         success_url: str,
         cancel_url: str,
     ) -> CheckoutSession:
-        """Open an order with the provider and describe how to pay it."""
+        """Open an order with the provider and describe how to pay it.
+
+        The amount arrives already quoted rather than being read off ``pack``:
+        the pack stores one USD price, and which currency this buyer is paying in
+        is a decision made in :mod:`app.services.billing`, not one an adapter
+        should be able to reach a different answer on.
+        """
+
+    async def fetch_status(self, provider_order_id: str) -> GatewayStatus:
+        """Ask the provider what happened to this order.
+
+        This is the authoritative answer in the return flow: the buyer's browser
+        arriving at the success page proves only that they have a browser, so
+        nothing they carry with them decides anything. We ask the provider
+        ourselves, server to server, over an authenticated connection.
+        """
+
+    def verify_return_signature(self, provider_order_id: str, payload: dict[str, str]) -> bool:
+        """Whether a client-side return payload really came from the provider.
+
+        Only Razorpay's modal hands the browser anything to check. Providers
+        that return by redirect have nothing signed to offer, so this is ``True``
+        for them — :meth:`fetch_status` is what actually gates the grant either
+        way, and refusing here would only reject honest buyers.
+        """
 
 
 class StripeAdapter:
@@ -129,6 +190,8 @@ class StripeAdapter:
         *,
         payment_id: uuid.UUID,
         pack: CreditPack,
+        amount_minor: int,
+        currency: str,
         user: User,
         success_url: str,
         cancel_url: str,
@@ -138,10 +201,10 @@ class StripeAdapter:
                 "Card payments are not switched on yet. Nothing has been charged."
             )
 
-        # Prices are inline rather than referencing a Stripe Price object: the
-        # `credit_packs` row is the source of truth for what a pack costs, and
-        # keeping a mirror of it in Stripe's dashboard is a second place to
-        # forget to update.
+        # Prices are inline rather than referencing a Stripe Price object. That
+        # was already the right call with one price list; with five quoted from
+        # a USD base it is the only one — a Price object per pack per currency
+        # is fifteen dashboard entries to keep in step by hand.
         form = {
             "mode": "payment",
             "success_url": success_url,
@@ -151,11 +214,11 @@ class StripeAdapter:
             "customer_email": user.email,
             "metadata[payment_id]": str(payment_id),
             "line_items[0][quantity]": "1",
-            "line_items[0][price_data][currency]": pack.currency.lower(),
-            "line_items[0][price_data][unit_amount]": str(pack.amount_minor),
+            "line_items[0][price_data][currency]": currency.lower(),
+            "line_items[0][price_data][unit_amount]": str(amount_minor),
             "line_items[0][price_data][product_data][name]": pack.name,
             "line_items[0][price_data][product_data][description]": (
-                f"{pack.credits} Shevaani session credits"
+                f"{_sessions_label(pack.credits)} of live spoken English practice"
             ),
         }
 
@@ -178,6 +241,34 @@ class StripeAdapter:
             redirect_url=payload["url"],
         )
 
+    async def fetch_status(self, provider_order_id: str) -> GatewayStatus:
+        payload = await _get(
+            f"{STRIPE_CHECKOUT_SESSIONS}/{provider_order_id}",
+            headers={"Authorization": f"Bearer {settings.stripe_secret_key}"},
+            provider="Stripe",
+        )
+        # `payment_status`, not `status`. A session goes `complete` the moment the
+        # buyer finishes the form, which for delayed methods is well before the
+        # money settles — reading the wrong field grants credits on a bank
+        # transfer that has not arrived.
+        paid = payload.get("payment_status") == "paid"
+        payment_intent = payload.get("payment_intent")
+        return GatewayStatus(
+            paid=paid,
+            expired=payload.get("status") == "expired",
+            amount_minor=payload.get("amount_total") if paid else None,
+            currency=(payload.get("currency") or "").upper() or None,
+            # Expanded objects come back as a dict; unexpanded as a bare id.
+            provider_payment_id=(
+                payment_intent.get("id") if isinstance(payment_intent, dict) else payment_intent
+            ),
+        )
+
+    def verify_return_signature(self, provider_order_id: str, payload: dict[str, str]) -> bool:
+        # Stripe returns by redirect to a URL we built. There is nothing signed
+        # in it to check, and nothing in it is trusted: `fetch_status` decides.
+        return True
+
 
 class RazorpayAdapter:
     name = ProviderName.RAZORPAY
@@ -185,11 +276,26 @@ class RazorpayAdapter:
     def is_configured(self) -> bool:
         return bool(settings.razorpay_key_id and settings.razorpay_key_secret)
 
+    #: No currency allow-list. Razorpay is offered in every currency we quote
+    #: and the buyer chooses it knowingly, so the account's own capability is
+    #: the authority rather than a list here that would have to be kept in step
+    #: with it.
+    #:
+    #: What that costs: an account without international payments enabled will
+    #: reject a non-INR order. That comes back from `_post` as a 502 saying
+    #: "Razorpay refused to open the payment. Nothing has been charged." —
+    #: accurate, and raised before a card is involved, so the buyer can simply
+    #: use the other button. If those refusals become common, put the
+    #: allow-list back in `services.billing.PROVIDER_CURRENCIES` rather than
+    #: here; that is the layer the checkout page reads to grey a button out.
+
     async def create_checkout(
         self,
         *,
         payment_id: uuid.UUID,
         pack: CreditPack,
+        amount_minor: int,
+        currency: str,
         user: User,
         success_url: str,
         cancel_url: str,
@@ -198,12 +304,13 @@ class RazorpayAdapter:
             raise PaymentNotConfigured(
                 "Card and UPI payments are not switched on yet. Nothing has been charged."
             )
+        code = currency.upper()
 
         payload = await _post(
             RAZORPAY_ORDERS,
             json_body={
-                "amount": pack.amount_minor,
-                "currency": pack.currency.upper(),
+                "amount": amount_minor,
+                "currency": code,
                 # Max 40 characters at Razorpay; a bare UUID is 36.
                 "receipt": str(payment_id),
                 "notes": {"payment_id": str(payment_id), "credits": str(pack.credits)},
@@ -223,15 +330,56 @@ class RazorpayAdapter:
             client_payload={
                 "key_id": settings.razorpay_key_id,
                 "order_id": payload["id"],
-                "amount": pack.amount_minor,
-                "currency": pack.currency.upper(),
+                "amount": amount_minor,
+                "currency": code,
                 "name": "Shevaani",
-                "description": f"{pack.credits} session credits",
+                "description": _sessions_label(pack.credits),
                 "prefill": {"name": user.full_name, "email": user.email},
                 "success_url": success_url,
                 "cancel_url": cancel_url,
             },
         )
+
+    async def fetch_status(self, provider_order_id: str) -> GatewayStatus:
+        payload = await _get(
+            f"{RAZORPAY_ORDERS}/{provider_order_id}",
+            headers={"Authorization": _basic_auth(
+                settings.razorpay_key_id, settings.razorpay_key_secret
+            )},
+            provider="Razorpay",
+        )
+        paid = payload.get("status") == "paid"
+        return GatewayStatus(
+            paid=paid,
+            # An order sits at `created`/`attempted` indefinitely — Razorpay has
+            # no expiry to report, so an abandoned checkout stays open rather
+            # than being called failed on our own initiative.
+            expired=False,
+            # `amount_paid`, not `amount`: the second is what we asked for, the
+            # first is what arrived, and cross-checking against the request we
+            # made ourselves would check nothing.
+            amount_minor=payload.get("amount_paid") if paid else None,
+            currency=(payload.get("currency") or "").upper() or None,
+        )
+
+    def verify_return_signature(self, provider_order_id: str, payload: dict[str, str]) -> bool:
+        """Checkout.js hands the browser an HMAC over ``order_id|payment_id``.
+
+        Signed with the **key secret** — the opposite of the webhook rule at the
+        top of this module, which uses the webhook secret. They are different
+        values and swapping them fails every check, so the two paths deliberately
+        read different settings rather than sharing one "the Razorpay secret".
+        """
+        payment_id = payload.get("razorpay_payment_id")
+        signature = payload.get("razorpay_signature")
+        if not payment_id or not signature or not settings.razorpay_key_secret:
+            return False
+        expected = hmac.new(
+            settings.razorpay_key_secret.encode(),
+            f"{provider_order_id}|{payment_id}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return hmac.compare_digest(expected, signature)
 
 
 # ------------------------------------------------------------ HTTP plumbing
@@ -263,6 +411,32 @@ async def _post(
         logger.error("%s %s -> %s: %s", provider, url, response.status_code, response.text[:500])
         raise PaymentProviderError(
             f"{provider} refused to open the payment. Nothing has been charged."
+        )
+
+    return response.json()
+
+
+async def _get(url: str, *, headers: dict[str, str], provider: str) -> dict[str, Any]:
+    """One GET, for asking a provider what happened to an order.
+
+    Unlike :func:`_post` this runs *after* the buyer may have paid, so a failure
+    here is not "nothing was charged" — it is "we could not find out". It raises
+    rather than reporting a negative, because returning "not paid" on an
+    unreachable provider would let a timeout look like a refusal and strand
+    somebody who has genuinely been charged.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            response = await client.get(url, headers=headers)
+    except httpx.HTTPError as exc:
+        raise PaymentProviderError(
+            f"Could not reach {provider} to confirm your payment. Please try again in a moment."
+        ) from exc
+
+    if not response.is_success:
+        logger.error("%s GET %s -> %s: %s", provider, url, response.status_code, response.text[:500])
+        raise PaymentProviderError(
+            f"{provider} could not confirm this payment. Please try again in a moment."
         )
 
     return response.json()

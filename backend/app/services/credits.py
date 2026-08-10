@@ -72,8 +72,13 @@ async def spend(
         return None
     current = await balance(db, user_id)
     if current < amount:
+        # Unit-free on purpose. The ledger counts credits, but every screen a
+        # learner sees counts sessions, and a session that overrides its
+        # `price_credits` does not divide into a whole number of them — so
+        # quoting either unit here would be wrong somewhere. The balance itself
+        # is on screen already; what this needs to say is "not enough".
         raise InsufficientCredits(
-            f"This session costs {amount} credit(s) and you have {current}."
+            "You don't have enough left on your balance to book this session."
         )
     return await record(
         db, user_id, -amount, reason, booking_id=booking_id, note=note

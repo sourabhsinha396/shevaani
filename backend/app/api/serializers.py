@@ -15,10 +15,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.booking import Booking
-from app.models.enums import SEAT_HOLDING_STATUSES, BookingStatus
-from app.models.session import Session
+from app.models.enums import SEAT_HOLDING_STATUSES, BookingStatus, SessionKind
+from app.models.session import OneOnOneSession, Session
+from app.models.settings import SiteSettings
 from app.schemas.common import InstructorOut
 from app.schemas.session import SessionAdminOut, SessionOut
+from app.schemas.settings import SiteConfigOut
+
+
+def build_site_config(row: SiteSettings | None) -> SiteConfigOut:
+    """The flags, with the schema's defaults standing in for a deleted row.
+
+    The two callers — the public GET and the superuser PATCH — must agree about
+    what "no row" means, so the substitution happens once, here, rather than
+    twice at the edges."""
+    return SiteConfigOut.model_validate(row) if row is not None else SiteConfigOut()
 
 
 async def seat_counts(
@@ -75,8 +86,8 @@ async def session_roster(
 
     Shared by the superuser admin and the instructor's own view — the two must
     not be allowed to disagree about who is on the list. They differ in exactly
-    one respect: an instructor gets names and levels, not contact details, which
-    is what the privacy policy promises learners. That is enforced by leaving the
+    one respect: an instructor gets names, not contact details, which is what
+    the privacy policy promises learners. That is enforced by leaving the
     address out of the payload, not by hiding a column in the UI.
     """
     result = await db.execute(
@@ -93,7 +104,6 @@ async def session_roster(
                 "learner_id": str(b.learner_id),
                 "name": b.learner.full_name,
                 "email": b.learner.email if include_emails else None,
-                "level": b.learner.level.value if b.learner.level else None,
                 "status": b.status.value,
                 "first_joined_at": b.first_joined_at,
                 "attendance_confirmed_at": b.attendance_confirmed_at,
@@ -122,13 +132,14 @@ def build_session_out(
 ) -> SessionOut:
     return SessionOut(
         id=session.id,
-        kind=session.kind,
+        # Constant since 0009: this serialises `sessions`, and that table is
+        # group-only now. Kept on the payload so the frontend contract — and
+        # anything already reading it — does not have to change with the schema.
+        kind=SessionKind.GROUP,
         title=session.title,
         topic=session.topic,
         description=session.description,
         prep_material_url=session.prep_material_url,
-        level_min=session.level_min,
-        level_max=session.level_max,
         starts_at=session.starts_at,
         ends_at=session.ends_at,
         min_seats=session.min_seats,
@@ -139,6 +150,43 @@ def build_session_out(
         seats_taken=taken,
         seats_left=max(session.max_seats - taken, 0),
         is_full=taken >= session.max_seats,
+        my_booking_status=my_status,
+    )
+
+
+def build_one_on_one_out(
+    one_on_one: OneOnOneSession,
+    *,
+    my_status: BookingStatus | None = None,
+) -> SessionOut:
+    """A one-to-one in the same shape as a catalogue row.
+
+    It is not in a catalogue and never will be — it does not exist until
+    somebody books the hour. This exists so ``GET /bookings`` can return one
+    list: a learner's dashboard shows both kinds side by side, and giving it two
+    payload shapes for "the thing I booked" would push the difference into every
+    component that renders one. ``kind`` is how a client tells them apart.
+
+    The seat fields are constants because a one-to-one is one seat, taken by
+    definition — the row is the booking.
+    """
+    return SessionOut(
+        id=one_on_one.id,
+        kind=SessionKind.ONE_ON_ONE,
+        title=one_on_one.title,
+        topic=None,
+        description=None,
+        prep_material_url=None,
+        starts_at=one_on_one.starts_at,
+        ends_at=one_on_one.ends_at,
+        min_seats=1,
+        max_seats=1,
+        price_credits=one_on_one.price_credits,
+        status=one_on_one.status,
+        instructor=InstructorOut.model_validate(one_on_one.instructor),
+        seats_taken=1,
+        seats_left=0,
+        is_full=True,
         my_booking_status=my_status,
     )
 

@@ -128,8 +128,13 @@ def _local(when: datetime, timezone: str | None) -> str:
     return f"{when.astimezone(tz):%A %d %B, %H:%M} ({tz.key})"
 
 
+#: A$ rather than $ for AUD — a receipt is the last place to leave which dollar
+#: was charged open to interpretation.
+_SYMBOLS = {"INR": "₹", "USD": "$", "EUR": "€", "GBP": "£", "AUD": "A$"}
+
+
 def _money(amount_minor: int, currency: str) -> str:
-    symbol = {"INR": "₹", "USD": "$"}.get(currency.upper(), f"{currency.upper()} ")
+    symbol = _SYMBOLS.get(currency.upper(), f"{currency.upper()} ")
     return f"{symbol}{amount_minor / 100:,.2f}"
 
 

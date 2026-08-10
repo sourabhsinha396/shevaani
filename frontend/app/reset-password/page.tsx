@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-
-const MIN_LENGTH = 10;
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH as MIN_LENGTH } from "@/lib/passwords";
 
 function ResetForm() {
   const router = useRouter();
@@ -60,7 +59,7 @@ function ResetForm() {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Field label="New password" hint={`At least ${MIN_LENGTH} characters.`}>
+      <Field label="New password" hint={PASSWORD_HINT}>
         <Input
           type="password"
           autoComplete="new-password"

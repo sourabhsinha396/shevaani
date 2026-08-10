@@ -17,8 +17,6 @@ from app.models.enums import (
     SEAT_HOLDING_STATUSES,
     BlockReason,
     BookingStatus,
-    CEFRLevel,
-    SessionKind,
     SessionStatus,
     UserRole,
 )
@@ -50,8 +48,6 @@ async def create_group_session(
     min_seats: int,
     max_seats: int,
     price_credits: int,
-    level_min: CEFRLevel,
-    level_max: CEFRLevel,
     topic: str | None = None,
     description: str | None = None,
     prep_material_url: str | None = None,
@@ -69,25 +65,19 @@ async def create_group_session(
             f"so no Meet link can be created. Ask them to connect it, or save this as a draft."
         )
 
-    if level_min.rank > level_max.rank:
-        raise DomainError("The minimum level cannot be above the maximum level.")
-
     ends_at = starts_at + timedelta(minutes=duration_minutes)
 
     await scheduling.lock_instructor(db, instructor_id)
     await scheduling.assert_instructor_available(
-        db, instructor_id, starts_at, ends_at, kind=SessionKind.GROUP
+        db, instructor_id, starts_at, ends_at, one_on_one=False
     )
 
     session = Session(
-        kind=SessionKind.GROUP,
         status=SessionStatus.PUBLISHED if publish else SessionStatus.DRAFT,
         title=title,
         topic=topic,
         description=description,
         prep_material_url=prep_material_url,
-        level_min=level_min,
-        level_max=level_max,
         starts_at=starts_at,
         ends_at=ends_at,
         min_seats=min_seats,
@@ -116,8 +106,6 @@ async def update_group_session(
     topic: str | None = None,
     description: str | None = None,
     prep_material_url: str | None = None,
-    level_min: CEFRLevel | None = None,
-    level_max: CEFRLevel | None = None,
     min_seats: int | None = None,
     max_seats: int | None = None,
     price_credits: int | None = None,
@@ -147,12 +135,6 @@ async def update_group_session(
         session.description = description
     if prep_material_url is not None:
         session.prep_material_url = prep_material_url
-    if level_min is not None:
-        session.level_min = level_min
-    if level_max is not None:
-        session.level_max = level_max
-    if session.level_min.rank > session.level_max.rank:
-        raise DomainError("The minimum level cannot be above the maximum level.")
 
     if price_credits is not None:
         # Changing the price does not retro-charge or retro-refund existing bookings.
@@ -190,8 +172,10 @@ async def reschedule_session(
         session.instructor_id,
         starts_at,
         ends_at,
-        kind=session.kind,
-        exclude_session_id=session.id,
+        # `reschedule_session` only ever moves a group discussion — a 1:1 is
+        # cancelled and rebooked rather than dragged.
+        one_on_one=False,
+        exclude_source_id=session.id,
     )
 
     session.starts_at = starts_at
@@ -266,7 +250,7 @@ async def auto_cancel_underfilled(
 
     result = await db.execute(
         select(Session).where(
-            Session.kind == SessionKind.GROUP,
+            # No kind filter needed since 0009 — this table is group-only.
             Session.status == SessionStatus.PUBLISHED,
             Session.starts_at > now,
             Session.starts_at <= horizon,

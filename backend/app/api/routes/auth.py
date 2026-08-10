@@ -1,34 +1,26 @@
 from __future__ import annotations
 
-import uuid
-from typing import Annotated
-
-import jwt
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
-    ACCESS_COOKIE,
-    REFRESH_COOKIE,
+    LEGACY_REFRESH_COOKIE,
+    SESSION_COOKIE,
     CurrentUser,
     DbSession,
-    token_predates_password_change,
 )
 from app.api.ratelimit import limiter
 from app.core.config import settings
 from app.core.ratelimit import FORGOT_PASSWORD, LOGIN, REGISTER, VERIFY_EMAIL_SEND
 from app.core.security import (
-    REFRESH_TOKEN,
-    create_access_token,
-    create_refresh_token,
-    decode_token,
+    create_session_token,
     hash_password,
     needs_rehash,
     verify_password,
 )
 from app.integrations import slack
-from app.models.enums import PaymentProvider, UserRole
+from app.models.enums import CreditReason, UserRole
 from app.models.user import User
 from app.schemas.auth import (
     AuthOut,
@@ -40,52 +32,39 @@ from app.schemas.auth import (
     VerifyEmailIn,
 )
 from app.schemas.common import Message, UserOut
-from app.services import passwords, verification
+from app.services import credits, passwords, verification
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _SECURE = settings.environment != "development"
 
 
-def _set_cookies(response: Response, access: str, refresh: str) -> None:
+def _set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie(
-        ACCESS_COOKIE,
-        access,
+        SESSION_COOKIE,
+        token,
         httponly=True,
         secure=_SECURE,
         samesite="lax",
-        max_age=settings.access_token_ttl_minutes * 60,
-        path="/",
-    )
-    response.set_cookie(
-        REFRESH_COOKIE,
-        refresh,
-        httponly=True,
-        secure=_SECURE,
-        samesite="lax",
-        max_age=settings.refresh_token_ttl_days * 86400,
+        # Matched to the token's own TTL so the browser drops the cookie at the
+        # same moment the signature stops verifying. Two different clocks here
+        # is how you get a cookie that is sent but always rejected.
+        max_age=settings.session_ttl_days * 86400,
         path="/",
     )
 
 
 async def _issue(response: Response, db: AsyncSession, user: User) -> AuthOut:
-    """Mint a fresh pair, set the cookies, and return the standard auth payload.
+    """Mint a session token, set the cookie, and return the standard auth payload.
 
-    Tokens are minted *after* the caller has mutated the user, so anything that
-    moved ``password_changed_at`` forward has already done so and the tokens
-    handed back here survive the check in ``api.deps``.
+    The token is minted *after* the caller has mutated the user, so anything that
+    moved ``password_changed_at`` forward has already done so and the token
+    handed back here survives the check in ``api.deps``.
     """
     await db.flush()
-    access = create_access_token(user.id, user.role.value)
-    refresh = create_refresh_token(user.id)
-    _set_cookies(response, access, refresh)
-    return AuthOut(user=UserOut.model_validate(user), access_token=access, refresh_token=refresh)
-
-
-def _provider_for(country: str | None) -> PaymentProvider | None:
-    if not country:
-        return None
-    return PaymentProvider.RAZORPAY if country.upper() == "IN" else PaymentProvider.STRIPE
+    token = create_session_token(user.id, user.role.value)
+    _set_session_cookie(response, token)
+    return AuthOut(user=UserOut.model_validate(user), access_token=token)
 
 
 @router.post(
@@ -105,13 +84,36 @@ async def register(payload: RegisterIn, response: Response, db: DbSession) -> Au
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
         timezone=payload.timezone,
+        # Detected by the browser from the same timezone it sends above, not
+        # asked for. It no longer decides anything at checkout — the currency
+        # does that — so it is kept for support and reporting rather than as a
+        # setting the buyer would have to get right at signup.
         billing_country=payload.billing_country,
-        preferred_provider=_provider_for(payload.billing_country),
+        # Left unset. Pinning a provider from the signup country outlived its
+        # usefulness the moment currency started deciding the gateway, and a
+        # stale pin is worse than none: it survives the learner moving country.
+        # `services.billing.provider_for` still honours one if support sets it.
         # Instructor and superuser are assigned out of band — never self-service.
         role=UserRole.LEARNER,
     )
     db.add(user)
     auth = await _issue(response, db, user)
+
+    # The welcome credit. Written here rather than by a trigger or a worker so
+    # it lands in the same transaction as the account — an account that exists
+    # without its credit, or a credit without an account, are both worse than
+    # a registration that fails outright and is retried.
+    #
+    # Once, at creation. Nothing else in the codebase writes SIGNUP_BONUS, so
+    # the ledger cannot accumulate a second one for the same person.
+    if settings.signup_bonus_credits > 0:
+        await credits.grant(
+            db,
+            user.id,
+            settings.signup_bonus_credits,
+            CreditReason.SIGNUP_BONUS,
+            note="Welcome credit",
+        )
 
     # Sent, not enforced: signup completes and booking works whether or not the
     # link is ever opened. See services/verification.py for why.
@@ -143,34 +145,6 @@ async def login(payload: LoginIn, response: Response, db: DbSession) -> AuthOut:
         # A rehash is not a password *change* — leave password_changed_at alone
         # or every login would sign the learner's other browsers out.
         user.password_hash = hash_password(payload.password)
-
-    return await _issue(response, db, user)
-
-
-@router.post("/refresh", response_model=AuthOut)
-async def refresh_tokens(
-    response: Response,
-    db: DbSession,
-    shevaani_refresh: Annotated[str | None, Cookie()] = None,
-) -> AuthOut:
-    if not shevaani_refresh:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No refresh token")
-    try:
-        payload = decode_token(shevaani_refresh, REFRESH_TOKEN)
-    except jwt.PyJWTError as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token") from exc
-
-    user = await db.get(User, uuid.UUID(payload["sub"]))
-    if user is None or not user.is_active:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account not available")
-
-    # Without this, a password change could be undone by any browser holding an
-    # old refresh token — it would simply trade it for a fresh access token and
-    # carry on. The refresh endpoint is the one that has to enforce this.
-    if token_predates_password_change(payload, user):
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Your password changed. Please sign in again."
-        )
 
     return await _issue(response, db, user)
 
@@ -251,8 +225,8 @@ async def verify_email(payload: VerifyEmailIn, db: DbSession) -> UserOut:
 
 @router.post("/logout", response_model=Message)
 async def logout(response: Response) -> Message:
-    response.delete_cookie(ACCESS_COOKIE, path="/")
-    response.delete_cookie(REFRESH_COOKIE, path="/")
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(LEGACY_REFRESH_COOKIE, path="/")
     return Message(detail="Signed out.")
 
 

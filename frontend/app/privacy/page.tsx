@@ -34,9 +34,11 @@ export default function PrivacyPage() {
       <ul>
         <li>
           <strong>Account</strong> — name, email address, password (stored only
-          as an Argon2 hash, never as text), time zone, and optionally your
-          English level and country. The country decides whether you check out in
-          rupees or dollars.
+          as an Argon2 hash, never as text), and time zone. We do not ask for
+          your country: a rough one is inferred
+          from your time zone for support and reporting, and your checkout
+          currency comes from the same time zone, in your browser, with no
+          location lookup and no third party involved.
         </li>
         <li>
           <strong>Bookings</strong> — which sessions you booked, when, whether
@@ -86,9 +88,8 @@ export default function PrivacyPage() {
       <h2>Who else sees it</h2>
       <ul>
         <li>
-          <strong>Your instructor</strong> — your name, your level, and whether
-          you attended their session. Not your email, your balance, or your other
-          bookings.
+          <strong>Your instructor</strong> — your name, and whether you attended
+          their session. Not your email, your balance, or your other bookings.
         </li>
         <li>
           <strong>Google</strong> — a session is a Google Calendar event on the

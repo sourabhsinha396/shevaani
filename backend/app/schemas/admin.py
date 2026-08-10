@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import BookingStatus, CEFRLevel, CreditReason
+from app.models.enums import BookingStatus, CreditReason
 from app.schemas.common import ORMModel
 
 
@@ -15,7 +15,6 @@ class LearnerSummaryOut(BaseModel):
     #: Plain ``str`` on the way out. ``EmailStr`` here would 500 a whole listing
     #: over one legacy address the validator dislikes (`.local`, say).
     email: str
-    level: CEFRLevel | None = None
     is_active: bool
     timezone: str
     created_at: datetime

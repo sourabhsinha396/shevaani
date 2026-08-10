@@ -77,8 +77,7 @@ export default function AdminLearnersPage() {
                     )}
                   </p>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    {learner.email}
-                    {learner.level && ` · ${learner.level}`} · {learner.timezone}
+                    {learner.email} · {learner.timezone}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-sm">

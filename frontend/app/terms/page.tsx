@@ -19,9 +19,9 @@ export default function TermsPage() {
       intro={
         <>
           These terms cover using Shevaani — the account, the credits, and the
-          sessions themselves. Using the service means accepting them. Money
-          questions have their own page:{" "}
-          <Link href="/refunds">refunds and cancellations</Link>.
+          sessions themselves. Using the service means accepting them. What
+          happens to a credit when a session is cancelled has its own page:{" "}
+          <Link href="/refunds">cancellations and credits</Link>.
         </>
       }
     >
@@ -55,8 +55,8 @@ export default function TermsPage() {
       <h2>3. Credits</h2>
       <ul>
         <li>
-          Credits are bought in packs and spent on sessions. One credit books one
-          session unless a session says otherwise.
+          Credits are bought in packs and spent on sessions. Two credits book
+          one session, group or one-to-one, unless a session says otherwise.
         </li>
         <li>
           Credits do not expire, have no cash value in themselves, and cannot be
@@ -77,7 +77,7 @@ export default function TermsPage() {
         <li>
           Group discussions have a minimum and a maximum number of learners. Below
           the minimum two hours before the start, the session is cancelled
-          automatically and everyone is refunded.
+          automatically and everyone gets their credits back.
         </li>
         <li>
           One-to-one sessions are booked into an instructor&apos;s published
@@ -112,7 +112,7 @@ export default function TermsPage() {
         We aim to keep the service running but do not guarantee it is
         uninterrupted. If a session cannot go ahead because of a failure on our
         side, the remedy is the one in the{" "}
-        <Link href="/refunds">refund policy</Link>: your credit comes back.
+        <Link href="/refunds">cancellation policy</Link>: your credits come back.
       </p>
 
       <h2>7. Your content</h2>
@@ -130,7 +130,9 @@ export default function TermsPage() {
         </li>
         <li>
           We can suspend or close an account that breaks these terms. Where the
-          breach is not conduct-related, unused credits are refunded.
+          breach is not conduct-related, we will honour the credits on the
+          balance — by letting you spend them before the account closes, or by
+          moving them to another account you hold.
         </li>
       </ul>
 

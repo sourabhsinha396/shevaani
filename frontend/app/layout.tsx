@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import { Geist, Playfair_Display } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
+import { CurrencyProvider } from "@/components/currency-provider";
+import { SiteConfigProvider } from "@/components/site-config-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_NAME, SITE_URL, jsonLdScript, organizationJsonLd } from "@/lib/seo";
+import { getSiteConfig } from "@/lib/site-config";
 
 import "./globals.css";
 
@@ -26,7 +29,7 @@ export const metadata: Metadata = {
   // Every page below sets its own `title`; this template wraps it. The
   // `default` is what the homepage and anything that forgets will use.
   title: {
-    default: "Shevaani — speak English with real people",
+    default: "Shevaani - Group Discussions and 1-1 Sessions",
     template: "%s — Shevaani",
   },
   description: DESCRIPTION,
@@ -40,17 +43,23 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     locale: "en_IN",
     url: SITE_URL,
-    title: "Shevaani — speak English with real people",
+    title: "Shevaani - Group Discussions and 1-1 Sessions",
     description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Shevaani — speak English with real people",
+    title: "Shevaani - Group Discussions and 1-1 Sessions",
     description: DESCRIPTION,
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/* Async for one reason: the feature flags are read here, on the server, so the
+   header's first paint already has the right links in it. The fetch is cached
+   (see `getSiteConfig`), so this does not make every page dynamic — it puts them
+   on a one-minute revalidation window instead. */
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const siteConfig = await getSiteConfig();
+
   return (
     <html
       lang="en"
@@ -72,13 +81,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </noscript>
 
         <ThemeProvider>
-          <AuthProvider>
-            <div className="flex min-h-screen flex-col">
-              <SiteHeader />
-              <main className="flex-1">{children}</main>
-              <SiteFooter />
-            </div>
-          </AuthProvider>
+          {/* Outermost of the data providers: it is the only one whose value is
+              already known here, and both the chrome and the pages read it. */}
+          <SiteConfigProvider config={siteConfig}>
+            <AuthProvider>
+              {/* Sitewide so the homepage, /pricing and /checkout can never
+                  disagree about which currency someone is reading. Renders USD on
+                  the server and swaps to the detected one after hydration. */}
+              <CurrencyProvider>
+                <div className="flex min-h-screen flex-col">
+                  <SiteHeader />
+                  <main className="flex-1">{children}</main>
+                  <SiteFooter config={siteConfig} />
+                </div>
+              </CurrencyProvider>
+            </AuthProvider>
+          </SiteConfigProvider>
         </ThemeProvider>
       </body>
     </html>

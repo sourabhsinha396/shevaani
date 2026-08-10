@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
@@ -16,12 +17,10 @@ from app.core.ratelimit import BOOKING, JOIN, JOIN_PER_IP
 from app.models.booking import Booking, JoinAccessLog
 from app.models.enums import (
     BookingStatus,
-    CEFRLevel,
-    SessionKind,
     SessionStatus,
     UserRole,
 )
-from app.models.session import Session
+from app.models.session import OneOnOneSession, Session
 from app.schemas.booking import BookingOut
 from app.schemas.session import JoinOut, SessionOut
 from app.services import booking as booking_service
@@ -35,26 +34,24 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 async def list_sessions(
     db: DbSession,
     user: OptionalUser,
-    kind: Annotated[SessionKind, Query()] = SessionKind.GROUP,
-    level: Annotated[CEFRLevel | None, Query()] = None,
     starts_after: Annotated[datetime | None, Query()] = None,
     starts_before: Annotated[datetime | None, Query()] = None,
     include_full: Annotated[bool, Query()] = True,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[SessionOut]:
-    """Public catalogue. Only published, not-yet-started sessions."""
+    """Public catalogue of group discussions. Only published, not-yet-started.
+
+    The ``kind`` filter is gone with the column since 0009 — this table holds
+    nothing but group discussions now, and a one-to-one is never in a catalogue
+    to begin with: it does not exist until somebody books the hour.
+    """
     conditions = [
-        Session.kind == kind,
         Session.status == SessionStatus.PUBLISHED,
         Session.starts_at > (starts_after or utc_now()),
     ]
     if starts_before is not None:
         conditions.append(Session.starts_at < starts_before)
-    if level is not None:
-        # Show sessions whose band contains the requested level.
-        conditions.append(Session.level_min <= level)
-        conditions.append(Session.level_max >= level)
 
     result = await db.execute(
         select(Session)
@@ -121,24 +118,29 @@ async def join_session(
     db: DbSession,
     user: CurrentUser,
 ) -> JoinOut:
-    """Serve the Meet link.
+    """Serve the Meet link, and record that somebody walked through the door.
 
-    The join URL is a bearer credential — anyone holding it can attempt to join —
-    so it lives behind this one endpoint, gated on an active booking and the time
-    window, and every hit is logged.
+    The link itself is also on ``GET /bookings`` now — a Meet room admits nobody
+    before its host arrives, so a link seen early is a lobby and not a way in.
+    What this endpoint still owns is the *event*: it is called when a learner
+    actually goes to join, which is what makes the audit trail and the automatic
+    attendance signal mean anything. Fetching a page is not attending; clicking
+    join is at least a claim to have tried.
+
+    ``session_id`` may name either kind of session. A booking is what grants
+    access whichever table it lands in, and making a client know which endpoint
+    to call would only be asking it to re-derive something it was already told.
 
     The decision is resolved *before* anything is raised, because raising unwinds
     through the `get_db` dependency and rolls the transaction back. Denials are
     the rows worth having — they are how you spot someone probing for links — so
     the audit row is committed first and the error raised afterwards.
     """
-    result = await db.execute(
-        select(Session).options(selectinload(Session.meeting)).where(Session.id == session_id)
-    )
-    session = result.scalar_one_or_none()
+    session = await _load_joinable(db, session_id)
     if session is None:
         raise NotFound("Session not found.")
 
+    is_group = isinstance(session, Session)
     now = utc_now()
     is_host = user.id == session.instructor_id or user.role == UserRole.SUPERUSER
     window_opens = session.starts_at - timedelta(minutes=settings.join_window_before_minutes)
@@ -147,9 +149,10 @@ async def join_session(
 
     booking: Booking | None = None
     if not is_host:
+        parent_column = Booking.session_id if is_group else Booking.one_on_one_id
         booking_result = await db.execute(
             select(Booking).where(
-                Booking.session_id == session.id,
+                parent_column == session.id,
                 Booking.learner_id == user.id,
                 Booking.status.in_(
                     [BookingStatus.CONFIRMED, BookingStatus.ATTENDED, BookingStatus.NO_SHOW]
@@ -158,7 +161,8 @@ async def join_session(
         )
         booking = booking_result.scalars().first()
 
-    # Resolve the outcome without raising.
+    # Resolve the outcome without raising. There is no "too early" any more —
+    # the room is its own gate before the hour.
     denial: tuple[str, Exception] | None = None
     if not is_host and booking is None:
         denial = (
@@ -167,14 +171,6 @@ async def join_session(
         )
     elif session.status == SessionStatus.CANCELLED:
         denial = ("session_cancelled", OutsideJoinWindow("This session was cancelled."))
-    elif now < window_opens:
-        denial = (
-            "too_early",
-            OutsideJoinWindow(
-                f"The room opens {settings.join_window_before_minutes} minutes "
-                f"before the session."
-            ),
-        )
     elif now > window_closes:
         denial = ("too_late", OutsideJoinWindow("This session has finished."))
     elif meeting is None or not meeting.is_ready:
@@ -185,7 +181,8 @@ async def join_session(
 
     db.add(
         JoinAccessLog(
-            session_id=session.id,
+            session_id=session.id if is_group else None,
+            one_on_one_id=None if is_group else session.id,
             user_id=user.id,
             booking_id=booking.id if booking else None,
             accessed_at=now,
@@ -195,9 +192,18 @@ async def join_session(
         )
     )
 
-    # First successful fetch is the automatic attendance signal. The instructor
-    # confirms afterwards; conferenceRecords isn't available on consumer Gmail.
-    if denial is None and booking is not None and booking.first_joined_at is None:
+    # First fetch *within the window* is the automatic attendance signal. The
+    # window matters here even though it no longer gates the link: someone
+    # opening the room the evening before has not attended anything, and
+    # recording that they had would quietly make the roster wrong. The
+    # instructor confirms afterwards either way — conferenceRecords isn't
+    # available on consumer Gmail.
+    if (
+        denial is None
+        and booking is not None
+        and booking.first_joined_at is None
+        and now >= window_opens
+    ):
         booking.first_joined_at = now
 
     await db.commit()
@@ -211,3 +217,24 @@ async def join_session(
         starts_at=session.starts_at,
         ends_at=session.ends_at,
     )
+
+
+async def _load_joinable(
+    db: AsyncSession, session_id: uuid.UUID
+) -> Session | OneOnOneSession | None:
+    """Whichever table holds this id, with its meeting loaded. Ids are UUIDs
+    from two sequences that never collide, so trying one and then the other is
+    unambiguous."""
+    group = await db.execute(
+        select(Session).options(selectinload(Session.meeting)).where(Session.id == session_id)
+    )
+    session = group.scalar_one_or_none()
+    if session is not None:
+        return session
+
+    one_on_one = await db.execute(
+        select(OneOnOneSession)
+        .options(selectinload(OneOnOneSession.meeting))
+        .where(OneOnOneSession.id == session_id)
+    )
+    return one_on_one.scalar_one_or_none()

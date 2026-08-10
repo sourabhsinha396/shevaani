@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   ...pageMetadata({
     title: "Group English discussions",
   description:
-    "Small-group English conversation sessions by CEFR level. Six learners at most, forty-five minutes, one credit each. See what's on this week.",
+    "Small-group English conversation sessions. Six learners at most, forty-five minutes, one session each. See what's on this week.",
     path: "/discussions",
   }),
   // Re-declared at this level so session pages below inherit it. A parent that

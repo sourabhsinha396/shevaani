@@ -13,8 +13,10 @@ from app.models.enums import UserRole
 from app.models.user import User
 from app.services import passwords
 
-ACCESS_COOKIE = "shevaani_access"
-REFRESH_COOKIE = "shevaani_refresh"
+SESSION_COOKIE = "shevaani_access"
+#: No longer issued. Named only so logout can clear one left in a browser by an
+#: older build; remove this once those have all aged out.
+LEGACY_REFRESH_COOKIE = "shevaani_refresh"
 
 
 def _extract_token(cookie_value: str | None, authorization: str | None) -> str | None:

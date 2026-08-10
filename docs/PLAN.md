@@ -39,8 +39,11 @@ An English-learning platform. Two products sharing one scheduling engine:
   `app/services/scheduling.py`, with a database backstop (below).
 
 **Group discussion**
-- Created and edited by superusers: topic, description, CEFR band, start time,
-  duration, min/max seats, instructor, price in credits.
+- Created and edited by superusers: topic, description, start time, duration,
+  min/max seats, instructor, price in credits.
+- No CEFR band since migration 0011. Sorting learners into A2–C1 rooms needs
+  more sessions running than the timetable has; until then it narrowed an
+  already short list and promised a match nothing delivered.
 - Seats are allocated under a row lock; overflow goes to a waitlist.
 - A session under `min_seats` at T-2h auto-cancels and refunds credits.
 
@@ -76,13 +79,22 @@ is kept **off** the request path entirely:
 The admin session list surfaces meeting status (`pending` / `ready` / `failed`)
 with a retry action. This is the one thing in the system that can fail quietly.
 
-The join URL is a bearer credential — it is never included in list or detail
-serialisers, only served from `GET /api/v1/sessions/{id}/join` after checking
-enrollment and the time window, and every access is logged. It is also never in
-an email, never in a Slack message, and never in a rendered page: those are the
-three places somebody would otherwise put it for convenience. The endpoint is
-rate limited per user *and* per IP, because logging an enumeration attempt is
-not the same as stopping one.
+The join URL is never in a public serialiser: the catalogue is readable by
+anyone, so a link there would be a link handed to everyone. It is served on
+`GET /api/v1/bookings` — which is the caller's own bookings and nothing else —
+and from `GET /api/v1/sessions/{id}/join`, which checks enrollment, logs every
+access, and is rate limited per user *and* per IP because logging an enumeration
+attempt is not the same as stopping one.
+
+It is **not** gated on the time window any more. A Meet room admits nobody
+before its host arrives, so a link held back until fifteen minutes before the
+hour protected nothing and left a learner with a dashboard that could not answer
+"where do I go?". Attendance still is: `first_joined_at` is only set for a join
+inside the window, because clicking a link the evening before is not attending.
+
+It is still never in an email and never in a Slack message — the two places
+somebody would otherwise put it for convenience, and the two that leave copies
+outside anything we control.
 
 ## Phasing
 

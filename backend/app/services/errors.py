@@ -51,3 +51,14 @@ class MeetingNotReady(DomainError):
 
 class OutsideJoinWindow(Conflict):
     code = "outside_join_window"
+
+
+class FeatureDisabled(Conflict):
+    """Switched off in ``site_settings``, not unavailable for any other reason.
+
+    Its own code because the frontend has to tell it apart from "nobody is free
+    then": one is a temporary scheduling answer that invites picking another
+    slot, the other means the product isn't taking bookings at all today.
+    """
+
+    code = "feature_disabled"

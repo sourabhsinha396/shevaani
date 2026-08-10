@@ -8,17 +8,10 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Input, Select } from "@/components/ui/input";
+import { Field, Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-
-const COUNTRIES = [
-  { code: "IN", label: "India" },
-  { code: "US", label: "United States" },
-  { code: "GB", label: "United Kingdom" },
-  { code: "AE", label: "United Arab Emirates" },
-  { code: "SG", label: "Singapore" },
-  { code: "DE", label: "Germany" },
-];
+import { browserTimeZone, detectCountry } from "@/lib/currency";
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/passwords";
 
 function RegisterForm() {
   const router = useRouter();
@@ -29,12 +22,11 @@ function RegisterForm() {
     full_name: "",
     email: "",
     password: "",
-    billing_country: "IN",
   });
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   async function submit(event: React.FormEvent) {
@@ -44,8 +36,12 @@ function RegisterForm() {
     try {
       await api.register({
         ...form,
-        // The browser knows this better than any dropdown would.
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        // Both read off the browser, which knows them better than a dropdown
+        // would. The country used to be asked for because it picked the payment
+        // provider; the currency does that now, so it is only kept for support
+        // and can be null without costing anybody anything.
+        timezone: browserTimeZone() || undefined,
+        billing_country: detectCountry() ?? undefined,
       });
       await refresh();
       // Someone who came here from a pack on the pricing page is trying to buy,
@@ -65,7 +61,7 @@ function RegisterForm() {
           <CardHeader>
             <CardTitle className="text-2xl">Create your account</CardTitle>
             <CardDescription>
-              Takes a minute. Your first discussion credit is free.
+              Takes a minute. Half your first discussion is on us.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -76,26 +72,16 @@ function RegisterForm() {
               <Field label="Email">
                 <Input type="email" required value={form.email} onChange={set("email")} autoComplete="email" />
               </Field>
-              <Field label="Password" hint="At least 10 characters.">
+              <Field label="Password" hint={PASSWORD_HINT}>
                 <Input
                   type="password"
                   required
-                  minLength={10}
+                  minLength={PASSWORD_MIN_LENGTH}
                   value={form.password}
                   onChange={set("password")}
                   autoComplete="new-password"
                 />
               </Field>
-              <Field label="Country" hint="Decides which payment provider you'll check out with.">
-                <Select value={form.billing_country} onChange={set("billing_country")}>
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
               {error && <p className="text-destructive text-sm">{error}</p>}
 
               <Button type="submit" variant="brand" size="lg" disabled={busy}>
