@@ -9,7 +9,7 @@ import type { CreditPack } from "@/lib/types";
  * The price list, fetched once per mount.
  *
  * Takes no currency. Every pack arrives carrying prices for every currency we
- * sell in, so switching is a re-render — flipping the switcher must not put a
+ * sell in, so switching is a re-render - flipping the switcher must not put a
  * network round trip between the click and the new number.
  */
 export function usePacks() {
@@ -18,7 +18,7 @@ export function usePacks() {
 
   React.useEffect(() => {
     // Guarded because a fast unmount would otherwise set state on a gone
-    // component — the pricing page is reachable from the header on every route.
+    // component - the pricing page is reachable from the header on every route.
     let cancelled = false;
     api
       .creditPacks()

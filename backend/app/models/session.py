@@ -50,6 +50,10 @@ class Session(Base, UUIDPrimaryKey, Timestamped):
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: URL identity — ``/discussions/<slug>`` instead of a UUID. Derived from
+    #: the title at creation (``services/slugs.py``) and stable thereafter:
+    #: retitling does not move a URL people have already shared.
+    slug: Mapped[str] = mapped_column(String(250), nullable=False, unique=True, index=True)
     topic: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     #: Article link / question list emailed to learners before the session.
@@ -258,6 +262,11 @@ class SessionMeeting(Base, UUIDPrimaryKey, Timestamped):
 
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[str | None] = mapped_column(Text)
+
+    #: When the Fireflies bot was sent into this meeting. Set-once by the
+    #: dispatch cron; NULL means no bot (not configured, or the send failed
+    #: past the session window). The cron's idempotence key.
+    notetaker_dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     session: Mapped[Session | None] = relationship(
         back_populates="meeting", foreign_keys=[session_id]

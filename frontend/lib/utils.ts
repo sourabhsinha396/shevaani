@@ -20,6 +20,15 @@ export function formatDateTime(iso: string, timeZone: string = IST) {
   }).format(new Date(iso));
 }
 
+/** Date only - for facts where the hour is noise ("joined 5 Aug"). */
+export function formatDate(iso: string, timeZone: string = IST) {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    timeZone,
+  }).format(new Date(iso));
+}
+
 export function formatTime(iso: string, timeZone: string = IST) {
   return new Intl.DateTimeFormat("en-IN", {
     hour: "numeric",
@@ -49,7 +58,7 @@ export function durationMinutes(startIso: string, endIso: string) {
  *
  * Every learner-facing surface goes through this, so the card, the seat meter,
  * the detail page and checkout can never quote different numbers for the same
- * session. Admin screens deliberately do *not* — whoever runs the session needs
+ * session. Admin screens deliberately do *not* - whoever runs the session needs
  * the real figure to decide whether it goes ahead.
  *
  * Two properties matter more than the padding itself, because breaking either

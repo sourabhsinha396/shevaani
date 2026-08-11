@@ -9,22 +9,27 @@ at Google degrades the admin view instead of breaking bookings.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.security import decrypt_secret
 from app.integrations import email as email_service
-from app.integrations import google_calendar, slack
+from app.integrations import fireflies, google_calendar, slack
 from app.integrations.google_calendar import GoogleAPIError
-from app.models.enums import MeetingStatus, SessionStatus
+from app.models.enums import FeedbackStatus, MeetingStatus, SessionStatus, TranscriptStatus
+from app.models.feedback import SessionFeedback, SessionTranscript, TranscriptSpeaker
 from app.models.session import Session, SessionMeeting
 from app.models.user import GoogleCredential, User
 from app.services import backups, notifications, session_admin
 from app.services import booking as booking_service
+from app.services import feedback as feedback_service
+from app.services import transcripts as transcript_service
 from app.services.scheduling import utc_now
 
 logger = logging.getLogger(__name__)
@@ -103,6 +108,12 @@ def _describe(session: Session) -> str:
         "Learners join through Shevaani and will appear in the lobby — "
         "please join a few minutes early to admit them."
     )
+    if settings.fireflies_configured:
+        parts.append(
+            "Shevaani's notes bot (Fireflies.ai Notetaker) will also knock shortly "
+            "after the start — please admit it. It records the discussion so every "
+            "learner gets a written feedback report."
+        )
     return "\n\n".join(p for p in parts if p)
 
 
@@ -321,6 +332,274 @@ async def post_slack_message(ctx: dict, text: str) -> str:
     storm over a missed notification would be worse than the missed
     notification."""
     return "posted" if await slack.deliver(text) else "not posted"
+
+
+#: How far past its start a session can be and still get the bot sent in.
+#: Beyond this, half the discussion is already lost — a partial transcript
+#: would produce feedback about a meeting the learners don't recognise.
+NOTETAKER_WINDOW_MINUTES = 15
+
+
+async def dispatch_notetakers(ctx: dict) -> str:
+    """Send the Fireflies bot into meetings whose session just started.
+
+    ``addToLiveMeeting`` only works on an *ongoing* meeting, which is why this
+    is a cron and not part of meeting creation. ``notetaker_dispatched_at`` is
+    the idempotence key: it is set only on a successful send, so a failed one
+    is retried on the next tick until the window closes.
+    """
+    if not settings.fireflies_configured:
+        return "not configured"
+
+    now = utc_now()
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(Session)
+            .join(SessionMeeting, SessionMeeting.session_id == Session.id)
+            .options(selectinload(Session.meeting))
+            .where(
+                Session.status == SessionStatus.PUBLISHED,
+                Session.starts_at <= now,
+                Session.starts_at > now - timedelta(minutes=NOTETAKER_WINDOW_MINUTES),
+                SessionMeeting.status == MeetingStatus.READY,
+                SessionMeeting.notetaker_dispatched_at.is_(None),
+            )
+        )
+        sessions = list(result.scalars().all())
+
+        sent = 0
+        for session in sessions:
+            meeting = session.meeting
+            if not meeting or not meeting.join_url:
+                continue
+            duration = int((session.ends_at - session.starts_at).total_seconds() // 60)
+            try:
+                ok = await fireflies.add_to_live_meeting(
+                    meeting_link=meeting.join_url,
+                    title=session.title,
+                    duration_minutes=duration,
+                )
+            except fireflies.FirefliesAPIError as exc:
+                # Rate limit or blip: the next tick retries while the window
+                # is open. Log rather than alert — a session with no
+                # transcript is a degraded extra, not an incident.
+                logger.warning("Notetaker dispatch failed for %s: %s", session.id, exc)
+                continue
+            if ok:
+                meeting.notetaker_dispatched_at = utc_now()
+                sent += 1
+        await db.commit()
+    return f"dispatched {sent}/{len(sessions)}"
+
+
+_MEET_CODE = re.compile(r"meet\.google\.com/([a-z0-9-]+)", re.IGNORECASE)
+
+
+async def ingest_fireflies_transcript(ctx: dict, provider_transcript_id: str) -> str:
+    """Fetch a finished transcript, attach it to its session, resolve speakers.
+
+    Matching is by Meet code: the transcript's ``meeting_link`` and the
+    meeting's ``join_url`` both contain it. A transcript we can't place is
+    normal — the account may also record meetings that aren't sessions — so
+    it's an ignore, not an error.
+    """
+    if not settings.fireflies_configured:
+        return "not configured"
+
+    transcript_data = await fireflies.fetch_transcript(provider_transcript_id)
+    code_match = _MEET_CODE.search(transcript_data.meeting_link or "")
+    if code_match is None:
+        return "no meet link"
+
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(SessionMeeting).where(
+                SessionMeeting.session_id.is_not(None),
+                SessionMeeting.join_url.ilike(f"%{code_match.group(1)}%"),
+            )
+        )
+        meeting = result.scalar_one_or_none()
+        if meeting is None:
+            return "no matching session"
+
+        existing = await db.execute(
+            select(SessionTranscript).where(
+                SessionTranscript.provider_transcript_id == provider_transcript_id
+            )
+        )
+        transcript = existing.scalar_one_or_none()
+        if transcript is None:
+            transcript = SessionTranscript(
+                session_id=meeting.session_id,
+                provider_transcript_id=provider_transcript_id,
+            )
+            db.add(transcript)
+
+        transcript.duration_minutes = transcript_data.duration_minutes
+        transcript.sentences = [
+            {"speaker": s.speaker, "text": s.text, "start": s.start, "end": s.end}
+            for s in transcript_data.sentences
+        ]
+        await db.flush()
+
+        fully_resolved = await transcript_service.resolve_speakers(db, transcript)
+        if fully_resolved:
+            await transcript_service.learn_aliases(db, transcript)
+        transcript_id = str(transcript.id)
+        session = await db.get(Session, meeting.session_id)
+        title = session.title if session else "?"
+        unmatched = [
+            s.speaker_label
+            for s in (
+                await db.execute(
+                    select(TranscriptSpeaker).where(
+                        TranscriptSpeaker.transcript_id == transcript.id
+                    )
+                )
+            ).scalars()
+            if s.user_id is None and not s.ignored
+        ]
+        await db.commit()
+
+    if fully_resolved:
+        await ctx["redis"].enqueue_job("generate_session_feedback", transcript_id)
+        return "resolved"
+
+    await slack.deliver(
+        f"Transcript for “{title}” needs speaker review — "
+        f"unmatched: {', '.join(unmatched)}. Map them in /admin (Transcript speakers), "
+        "the sweep will pick it up."
+    )
+    return f"needs review ({len(unmatched)} unmatched)"
+
+
+async def sweep_review_transcripts(ctx: dict) -> str:
+    """Close the human-review loop.
+
+    An admin fixes speaker mappings as plain row edits in sqladmin — nothing
+    there can enqueue a job. This sweep notices NEEDS_REVIEW transcripts whose
+    speakers are now all mapped or ignored, learns the aliases, and queues
+    generation. Also re-queues RESOLVED transcripts that somehow have no
+    feedback rows (a generation that died gets a second chance).
+    """
+    requeued = 0
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(SessionTranscript)
+            .options(selectinload(SessionTranscript.speakers))
+            .where(SessionTranscript.status == TranscriptStatus.NEEDS_REVIEW)
+        )
+        for transcript in result.scalars():
+            if not transcript.speakers:
+                continue
+            if all(s.user_id is not None or s.ignored for s in transcript.speakers):
+                transcript.status = TranscriptStatus.RESOLVED
+                # Admin-set rows have no resolved_via yet — stamp them so
+                # alias learning and future audits know a human decided.
+                for s in transcript.speakers:
+                    if s.user_id is not None and s.resolved_via is None:
+                        s.resolved_via = "admin"
+                await transcript_service.learn_aliases(db, transcript)
+                await ctx["redis"].enqueue_job(
+                    "generate_session_feedback", str(transcript.id)
+                )
+                requeued += 1
+        await db.commit()
+    return f"requeued {requeued}"
+
+
+async def generate_session_feedback(ctx: dict, transcript_id: str) -> str:
+    """Draft the per-learner reports. The expensive step, so it is its own job
+    with its own timeout — one model call over the whole transcript."""
+    if not settings.feedback_configured:
+        return "not configured"
+
+    async with SessionLocal() as db:
+        try:
+            written = await feedback_service.generate_feedback(db, uuid.UUID(transcript_id))
+        except Exception as exc:  # noqa: BLE001 — record the failure on the row
+            transcript = await db.get(SessionTranscript, uuid.UUID(transcript_id))
+            if transcript is not None:
+                transcript.last_error = str(exc)[:2000]
+            await db.commit()
+            raise  # let ARQ retry with backoff
+        transcript = await db.get(
+            SessionTranscript,
+            uuid.UUID(transcript_id),
+            options=[selectinload(SessionTranscript.session)],
+        )
+        title = transcript.session.title if transcript and transcript.session else "?"
+        if transcript is not None:
+            transcript.last_error = None
+        await db.commit()
+
+    if written:
+        await slack.deliver(
+            f"Feedback drafts ready for “{title}” — {written} report(s). "
+            "Review and publish in /admin (Session feedback)."
+        )
+    return f"wrote {written}"
+
+
+async def finalize_session_feedback(ctx: dict, transcript_id: str) -> str:
+    """The review surface's one big button: regenerate from the current
+    mappings, then publish everything.
+
+    Deliberately allowed to overwrite published rows — unlike the automatic
+    pipeline, this runs because an instructor just said "the mappings are
+    right, ship it", and stale reports from before a remap are exactly what
+    they're asking to replace.
+    """
+    if not settings.feedback_configured:
+        return "not configured"
+
+    tid = uuid.UUID(transcript_id)
+    async with SessionLocal() as db:
+        # Everything generate_feedback will touch, loaded up front: its own
+        # db.get() hits the identity map and does NOT re-apply loader options,
+        # so anything missing here would be a lazy load on an async session.
+        transcript = await db.get(
+            SessionTranscript,
+            tid,
+            options=[
+                selectinload(SessionTranscript.speakers).selectinload(TranscriptSpeaker.user),
+                selectinload(SessionTranscript.session).selectinload(Session.instructor),
+            ],
+        )
+        if transcript is None:
+            return "transcript gone"
+        if any(s.user_id is None and not s.ignored for s in transcript.speakers):
+            return "unmatched speakers"
+
+        transcript.status = TranscriptStatus.RESOLVED
+        for s in transcript.speakers:
+            if s.user_id is not None and s.resolved_via is None:
+                s.resolved_via = "admin"
+        await transcript_service.learn_aliases(db, transcript)
+
+        # Reopen published rows so generation refreshes them too, then publish
+        # the lot in the same transaction as the regenerated text.
+        existing = await db.execute(
+            select(SessionFeedback).where(SessionFeedback.transcript_id == tid)
+        )
+        for row in existing.scalars():
+            row.status = FeedbackStatus.DRAFT
+        await db.flush()
+
+        written = await feedback_service.generate_feedback(db, tid)
+
+        now = utc_now()
+        rows = await db.execute(
+            select(SessionFeedback).where(SessionFeedback.transcript_id == tid)
+        )
+        published = 0
+        for row in rows.scalars():
+            row.status = FeedbackStatus.PUBLISHED
+            row.published_at = now
+            published += 1
+        await db.commit()
+
+    return f"regenerated {written}, published {published}"
 
 
 async def mark_sessions_completed(ctx: dict) -> str:

@@ -27,9 +27,9 @@ const FEATURES = [
   },
   {
     Icon: Mic,
-    name: "Forty-five minutes of talking",
+    name: "You figure out how to get opportunity",
     description:
-      "Not a lecture with questions at the end. An instructor keeps it moving and makes sure the quiet ones get the floor.",
+      "Moderator won't give you opportunity, You learn to snatch it.",
     wash: "bg-gradient-to-bl from-(--brand)/10 to-transparent",
   },
   {
@@ -48,23 +48,23 @@ const FEATURES = [
   },
   {
     Icon: Globe2,
-    name: "Sessions across 8 countries",
+    name: "Global discussions, local time",
     description:
-      "You practise against accents you will actually meet, not against one teacher from one place.",
+      "You might meet extremely capable people from around the world.",
     wash: "bg-gradient-to-b from-(--brand)/10 to-transparent",
   },
   {
     Icon: RefreshCw,
-    name: "Cancel and keep the session",
+    name: "12 hours to cancel",
     description:
-      "Up to twelve hours before. It goes straight back on your balance — no refund queue to stand in.",
+      "You can cancel or postpone upto 12 hours before the session. We return you the session back to your balance.",
     wash: "bg-gradient-to-tl from-(--brand)/10 to-transparent",
   },
   {
     Icon: ShieldCheck,
-    name: "Under-booked sessions auto-cancel",
+    name: "Secured Payment Gateway",
     description:
-      "If a discussion hasn't filled two hours out, it cancels itself and everyone gets their session back. You never sit in an empty room.",
+      "We use Stripe, Razorpay and Paypal for secure payments. Your card details are never reach our servers.",
     className: "lg:col-span-2",
     wash: "bg-gradient-to-tl from-(--brand)/15 via-transparent to-transparent",
   },
@@ -73,14 +73,17 @@ const FEATURES = [
 /** What a room actually asks of you, scrolling. This used to be the CEFR ladder;
  *  the product no longer sorts anyone into a band, and a marquee of labels
  *  nothing in the app acts on was a promise the timetable could not keep. */
-const SKILLS = [
-  "Getting by",
-  "Holding a conversation",
-  "Saying what you think",
-  "Disagreeing politely",
-  "Telling a story",
-  "Arguing a point",
-  "Getting the joke",
+const TOPICS = [
+  "Will AI take your job?",
+  "Neo Banks vs Traditional Banks",
+  "Globalalization or Regionalization?",
+  "Work from home or office?",
+  "The future of AI",
+  "Should Social Media be Regulated?",
+  "Is Remote Work the Future?",
+  "The Impact of Climate Change",
+  "The Role of Technology in Education",
+  "Should AI be Regulated?",
 ];
 
 export function Features() {
@@ -89,7 +92,7 @@ export function Features() {
       <div className="container-page">
         <Reveal className="max-w-2xl">
           <p className="eyebrow mb-5">Why it works</p>
-          <h2 className="text-4xl text-balance md:text-5xl">
+          <h2 className="text-4xl text-balance">
             Our Features
           </h2>
           <p className="text-muted-foreground mt-5 text-pretty">
@@ -114,14 +117,14 @@ export function Features() {
         {/* Scrolling the other way to the topic marquee up top, so the page
             never looks like it is repeating itself. */}
         <div className="border-border/60 mt-14 border-t pt-8">
-          <p className="eyebrow mb-5 text-center">What an hour here is for</p>
+          <p className="eyebrow mb-5 text-center">Book a one-on-one session on</p>
           <Marquee speed={38} reverse>
-            {SKILLS.map((skill) => (
+            {TOPICS.map((topic) => (
               <span
-                key={skill}
+                key={topic}
                 className="border-border text-muted-foreground rounded-full border px-4 py-1.5 text-sm whitespace-nowrap"
               >
-                {skill}
+                {topic}
               </span>
             ))}
           </Marquee>

@@ -20,7 +20,7 @@ import type { Payment } from "@/lib/types";
 
 //: Each attempt is a real round trip to the provider, so this is deliberately
 //: short. Anything slower than half a minute is an asynchronous payment method
-//: settling, and the webhook backstop is what covers those — not a longer poll.
+//: settling, and the webhook backstop is what covers those - not a longer poll.
 const POLL_MS = 2500;
 const MAX_POLLS = 8;
 
@@ -47,7 +47,7 @@ function CheckoutSuccess() {
   React.useEffect(() => setPending(readPendingBooking()), []);
 
   // Razorpay's checkout hands these back on the way out. Absent for Stripe,
-  // which redirects with nothing signed to carry. Passed through as-is — the
+  // which redirects with nothing signed to carry. Passed through as-is - the
   // server decides what they are worth, which is: an extra barrier, never the
   // thing that grants.
   const razorpayPaymentId = params.get("razorpay_payment_id");
@@ -75,7 +75,7 @@ function CheckoutSuccess() {
           await refresh(); // balance in the header catches up
           return;
         }
-        // `created` means the provider does not yet call it paid — an async
+        // `created` means the provider does not yet call it paid - an async
         // method still clearing, or the buyer abandoned the page. Ask again a
         // few times, then leave it to the webhook.
         if (next.status === "created" && attempt < MAX_POLLS) {
@@ -91,7 +91,7 @@ function CheckoutSuccess() {
       cancelled = true;
       clearTimeout(timer);
     };
-    // Keyed on the payment id alone — `refresh` changes identity whenever auth
+    // Keyed on the payment id alone - `refresh` changes identity whenever auth
     // state does, and re-running this would restart the poll loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentId]);
@@ -104,7 +104,7 @@ function CheckoutSuccess() {
           <p className="font-medium">We couldn&apos;t confirm that payment</p>
           <p className="text-muted-foreground mt-1 text-pretty">{error}</p>
           <p className="text-muted-foreground mt-3 text-pretty">
-            If money left your account, nothing is lost — reload this page in a
+            If money left your account, nothing is lost - reload this page in a
             minute, or send us the reference below.
           </p>
           <p className="text-muted-foreground mt-3 font-mono text-xs break-all">
@@ -133,11 +133,11 @@ function CheckoutSuccess() {
           </p>
           <p className="text-muted-foreground mt-1 text-pretty">
             {formatMinor(payment.amount_minor, payment.currency)} paid. They&apos;re
-            on your balance and every change to it is listed on your dashboard.
+            on your balance.
             {pending &&
               (pending.kind === "discussion"
-                ? " Your seat still needs taking — nothing was held while you paid."
-                : " The time you picked still needs confirming — nothing was held while you paid.")}
+                ? " Finish booking your seat."
+                : " The time you picked still needs confirming - nothing was held while you paid.")}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {pending ? (
@@ -187,7 +187,7 @@ function CheckoutSuccess() {
         <p className="font-medium">Still confirming</p>
         <p className="text-muted-foreground mt-1 text-pretty">
           {polls >= MAX_POLLS
-            ? "The provider hasn't called this one settled yet. Your sessions appear on their own the moment it does — you don't need to pay again. If nothing has changed in an hour, send us the payment reference below."
+            ? "The provider hasn't called this one settled yet. Your sessions appear on their own the moment it does - you don't need to pay again. If nothing has changed in an hour, send us the payment reference below."
             : "We're asking your provider to confirm the payment. Your sessions appear the moment it does."}
         </p>
         <p className="text-muted-foreground mt-3 font-mono text-xs break-all">

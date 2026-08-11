@@ -16,7 +16,7 @@ export default function AdminLearnersPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Support questions arrive as half a name, so search as you type — but not on
+  // Support questions arrive as half a name, so search as you type - but not on
   // every keystroke, which would be one request per letter.
   React.useEffect(() => {
     const handle = setTimeout(() => {

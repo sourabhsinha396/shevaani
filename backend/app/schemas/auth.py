@@ -21,6 +21,10 @@ class RegisterIn(BaseModel):
     #: than asked for. Optional, and no longer load-bearing: currency decides the
     #: gateway and the price, so a wrong or missing country costs nothing.
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
+    #: The ``?r=`` a shared link carried, if the browser kept one. Attribution
+    #: only — an unknown or mangled code is ignored, never an error, because a
+    #: typo in somebody's WhatsApp message must not block a registration.
+    referral_code: str | None = Field(default=None, max_length=32)
 
     @field_validator("timezone")
     @classmethod

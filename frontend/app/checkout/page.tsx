@@ -51,7 +51,7 @@ function readSlot(params: Pick<URLSearchParams, "get">): PendingOneOnOne | null 
  * Sells packs, never a single session (PLAN decision 9).
  *
  * The currency is the one the browser detected, shared with the pricing page
- * through the sitewide provider — so the number here is the number that was
+ * through the sitewide provider - so the number here is the number that was
  * quoted two clicks ago. It is sent to `/billing/profile` and `/billing/checkout`
  * as a code and never as an amount: the server re-quotes from the pack's USD
  * base price, so the displayed figure is a claim to be confirmed, not an input.
@@ -70,7 +70,7 @@ function Checkout() {
   const [packs, setPacks] = React.useState<CreditPack[]>([]);
   const [selected, setSelected] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
-  // Which provider is mid-flight — two buttons share this and only the pressed
+  // Which provider is mid-flight - two buttons share this and only the pressed
   // one should spin.
   const [busy, setBusy] = React.useState<PaymentProvider | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -109,7 +109,7 @@ function Checkout() {
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-    // Re-runs on a currency switch because the *provider* can change with it —
+    // Re-runs on a currency switch because the *provider* can change with it -
     // rupees lead with Razorpay, everything else with Stripe. The pack prices do
     // not need refetching; each row already carries every currency.
   }, [user, params, currency]);
@@ -122,7 +122,7 @@ function Checkout() {
   const price = pack ? priceFor(pack, active) : null;
 
   /** Spends a credit and creates the session. The instructor is chosen by the
-   *  server — the learner picked an hour, not a person. */
+   *  server - the learner picked an hour, not a person. */
   async function confirmBooking() {
     if (!pending) return;
     setBooking(true);
@@ -228,7 +228,7 @@ function Checkout() {
           </p>
         </div>
         {/* Currency sits in the order summary now, beside the buttons it
-            actually governs — see `PayMethods`. */}
+            actually governs - see `PayMethods`. */}
         <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
           <Ticket className="size-3.5" /> {sessionBalanceLabel(credits)} left
         </Badge>
@@ -290,7 +290,7 @@ function Checkout() {
         </Card>
       )}
 
-      {/* Hidden once the credit is already in hand — there is nothing to buy. */}
+      {/* Hidden once the credit is already in hand - there is nothing to buy. */}
       {!bookNow && (
       <div className="mt-10 grid gap-6 md:grid-cols-[1fr_20rem]">
         <div className="flex flex-col gap-3">
@@ -392,15 +392,13 @@ function Checkout() {
               <p className="text-muted-foreground text-xs text-pretty">
                 We&apos;ll bring you back here to confirm{" "}
                 {slotLabel?.toLowerCase()} once the payment clears. The slot is
-                not held in the meantime — if somebody takes it first, what you
+                not held in the meantime - if somebody takes it first, what you
                 bought is still yours to spend on another.
               </p>
             )}
 
             <p className="text-muted-foreground text-xs text-pretty">
-              Sessions don&apos;t expire, and a cancelled booking puts its
-              session back on your balance. We don&apos;t return money to the
-              card — see the{" "}
+              Our{" "}
               <Link href="/refunds" className="underline underline-offset-4">
                 cancellation policy
               </Link>

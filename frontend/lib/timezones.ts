@@ -7,7 +7,7 @@
  * is a search box where a two-word answer would do.
  *
  * **Detection, then India.** The core team is in IST and the booking window is
- * defined in it, so an unplaceable browser gets Asia/Kolkata rather than UTC —
+ * defined in it, so an unplaceable browser gets Asia/Kolkata rather than UTC -
  * a zone somebody actually teaches in beats a zone nobody lives in.
  *
  * None of this changes what is bookable. The API sends UTC instants; a zone only
@@ -18,16 +18,16 @@ export const BOOKING_TIMEZONE = "Asia/Kolkata";
 
 export interface BookingZone {
   id: string;
-  /** What the picker shows. Not the IANA id — nobody thinks in "Europe/Berlin". */
+  /** What the picker shows. Not the IANA id - nobody thinks in "Europe/Berlin". */
   label: string;
 }
 
 export const BOOKING_ZONES: readonly BookingZone[] = [
-  { id: "Asia/Kolkata", label: "India — IST" },
-  { id: "Europe/London", label: "United Kingdom — London" },
-  { id: "Europe/Berlin", label: "Europe — Central European Time" },
-  { id: "America/New_York", label: "United States — Eastern" },
-  { id: "Australia/Sydney", label: "Australia — Sydney" },
+  { id: "Asia/Kolkata", label: "India - IST" },
+  { id: "Europe/London", label: "United Kingdom - London" },
+  { id: "Europe/Berlin", label: "Europe - Central European Time" },
+  { id: "America/New_York", label: "United States - Eastern" },
+  { id: "Australia/Sydney", label: "Australia - Sydney" },
 ] as const;
 
 export const TIMEZONE_COOKIE = "shevaani_timezone";
@@ -56,7 +56,7 @@ const EXACT: Record<string, string> = {
  * The closest of the five to a browser's own zone.
  *
  * Coarse on purpose. Someone in Los Angeles is shown New York, which is three
- * hours out — but it is three hours out in a zone they can reason about, and the
+ * hours out - but it is three hours out in a zone they can reason about, and the
  * picker is right there. Guessing precisely is not on the table with five
  * options; the job is to open on a plausible one instead of always on IST.
  */
@@ -108,14 +108,14 @@ export function writeTimezoneCookie(timeZone: string): void {
  * A saved choice, then the browser, then India.
  *
  * Only an explicit pick is written to the cookie, so detection re-runs for
- * everybody who never touched the switcher — which is what somebody who has
+ * everybody who never touched the switcher - which is what somebody who has
  * flown somewhere would want, and what somebody who overrode us would not.
  */
 export function detectBookingZone(): string {
   return readTimezoneCookie() ?? nearestBookingZone(browserTimeZone());
 }
 
-/** `2026-08-11` — the calendar date an instant falls on *in this zone*.
+/** `2026-08-11` - the calendar date an instant falls on *in this zone*.
  *
  *  Load-bearing: 07:00 IST is the previous evening in New York, so slots have to
  *  be regrouped by the reader's date or the calendar shows Tuesday's 9pm under
@@ -132,7 +132,7 @@ export function zonedDateKey(instant: Date | string, timeZone: string): string {
 
 /* [standard, daylight] for each of the five. Written out rather than taken from
    `Intl`, which returns "GMT+5:30" for Kolkata and "GMT+1" for Berlin under
-   every locale a British-English site would reasonably ask in — accurate, and
+   every locale a British-English site would reasonably ask in - accurate, and
    not what anybody calls the time where they live. */
 const ABBREVIATIONS: Record<string, [string, string]> = {
   "Asia/Kolkata": ["IST", "IST"],
@@ -148,12 +148,12 @@ function offsetMinutes(timeZone: string, at: Date): number {
     .formatToParts(at)
     .find((part) => part.type === "timeZoneName")?.value;
   const match = name?.match(/GMT([+-])(\d{2}):(\d{2})/);
-  if (!match) return 0; // "GMT" with no offset — the zone is on UTC.
+  if (!match) return 0; // "GMT" with no offset - the zone is on UTC.
   const sign = match[1] === "-" ? -1 : 1;
   return sign * (Number(match[2]) * 60 + Number(match[3]));
 }
 
-/** The abbreviation for a zone right now — "IST", "BST", "EDT". Shown beside the
+/** The abbreviation for a zone right now - "IST", "BST", "EDT". Shown beside the
  *  times so a reader can tell at a glance which clock they are reading. */
 export function zoneAbbreviation(timeZone: string, at: Date = new Date()): string {
   try {

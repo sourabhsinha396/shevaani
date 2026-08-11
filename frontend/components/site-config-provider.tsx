@@ -11,7 +11,7 @@ import type { SiteConfig } from "@/lib/types";
  * No fetching here on purpose. `useOneOnOneAvailability` has to probe from the
  * browser because its answer depends on a calendar that moves during a visit;
  * this one is the same for everybody and known before the HTML is written, so
- * fetching it client-side would only buy a frame of wrong chrome — the nav
+ * fetching it client-side would only buy a frame of wrong chrome - the nav
  * rendering a link and then deleting it, on every load.
  *
  * The default is the context default too, so a component mounted outside the

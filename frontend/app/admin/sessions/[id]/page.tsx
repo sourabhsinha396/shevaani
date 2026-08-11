@@ -11,7 +11,8 @@ import { RosterPanel } from "@/components/admin/roster-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Input, Textarea } from "@/components/ui/input";
+import { Field, Input } from "@/components/ui/input";
+import { RichTextEditor } from "@/components/ui/rich-text";
 import { api } from "@/lib/api";
 import type { AdminSession, Roster } from "@/lib/types";
 import { durationMinutes, formatDateTime } from "@/lib/utils";
@@ -157,7 +158,7 @@ export default function AdminSessionPage() {
             variant="outline"
             disabled={busy}
             onClick={() =>
-              void run(() => api.adminRetryMeeting(session.id), "Retrying — refresh shortly.")
+              void run(() => api.adminRetryMeeting(session.id), "Retrying - refresh shortly.")
             }
           >
             <RefreshCw className="size-4" /> Retry Meet
@@ -220,10 +221,9 @@ export default function AdminSessionPage() {
               />
             </Field>
             <Field label="Description">
-              <Textarea
-                rows={4}
+              <RichTextEditor
                 value={details.description}
-                onChange={(e) => setDetails({ ...details, description: e.target.value })}
+                onChange={(html) => setDetails({ ...details, description: html })}
               />
             </Field>
             <Field label="Prep material URL">

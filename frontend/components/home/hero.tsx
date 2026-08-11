@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Play } from "lucide-react";
 
@@ -12,15 +13,19 @@ import { WordRotate } from "@/components/ui/word-rotate";
 import { cn } from "@/lib/utils";
 
 /** The verb cycles; the sentence doesn't. Each one is something you can only
- *  do by opening your mouth — which is the whole argument of the product.
+ *  do by opening your mouth - which is the whole argument of the product.
  *  Keep them all within a character or two of "speaking": the rotator reserves
  *  the width of the longest word, so a long outlier leaves a visible gap after
  *  the short ones. Each must also read correctly with a bare "it". */
 const VERBS = ["speaking", "debating", "arguing", "pitching"];
 
-/** Initials on the stacked avatars under the CTAs. Deliberately not photos —
- *  stock faces on a language site read as invented testimonials. */
-const FACES = ["AR", "KM", "JS", "LP", "NT"];
+/** The stacked avatars under the CTAs - real learners, not stock faces. */
+const FACES = [
+  { name: "Shalini", src: "/images/homepage-session/shalini.png" },
+  { name: "Kundan", src: "/images/homepage-session/kundan.png" },
+  { name: "Divyanshu", src: "/images/homepage-session/divyanshu.png" },
+  { name: "Sourabh", src: "/images/homepage-session/sourabh.jpeg" },
+];
 
 export function Hero() {
   const { one_on_one_enabled: oneOnOneEnabled } = useSiteConfig();
@@ -40,16 +45,16 @@ export function Hero() {
 
       <div className="container-page relative">
         <div className="mx-auto max-w-3xl text-center">
-          <Link
+          {/* <Link
             href="/register"
             className="border-border/80 bg-background/60 hover:border-brand-ink/50 mx-auto mb-8 flex w-fit items-center gap-2 rounded-full border px-4 py-1.5 backdrop-blur transition-colors"
           >
             <span className="bg-brand size-1.5 rounded-full" />
             <AnimatedShinyText className="text-xs font-medium tracking-[0.15em] uppercase">
-              Your first discussion is free
+              4-8 learners in a discussion, feedback report
             </AnimatedShinyText>
             <ArrowRight className="text-muted-foreground size-3 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          </Link> */}
 
           <h1 className="text-5xl leading-[1.05] text-balance md:text-7xl">
             Stop studying English.{" "}
@@ -84,17 +89,19 @@ export function Hero() {
 
           <div className="text-muted-foreground mt-9 flex flex-col items-center justify-center gap-3 text-sm sm:flex-row">
             <div className="flex -space-x-2">
-              {FACES.map((initials) => (
-                <span
-                  key={initials}
-                  className="border-background bg-secondary text-secondary-foreground grid size-8 place-items-center rounded-full border-2 text-[10px] font-medium"
-                >
-                  {initials}
-                </span>
+              {FACES.map((face) => (
+                <Image
+                  key={face.name}
+                  src={face.src}
+                  alt={face.name}
+                  width={64}
+                  height={64}
+                  className="border-background bg-secondary size-8 rounded-full border-2 object-cover"
+                />
               ))}
             </div>
             <p>
-              <span className="text-foreground font-medium">12,632 learners</span>{" "}
+              <span className="text-foreground font-medium">29,632 learners</span>{" "}
               across 8 countries · no lessons, just conversation
             </p>
           </div>

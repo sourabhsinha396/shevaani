@@ -70,6 +70,23 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/v1/instructors/google/callback"
 
+    # Fireflies — the notetaker bot that records group discussions. One
+    # platform-owned Fireflies seat covers every instructor: the worker sends
+    # the bot into the Meet by URL at session start, and the transcript lands
+    # in that account's workspace, where the webhook + API pick it up.
+    fireflies_api_key: str = ""
+    #: Signs the `meeting.transcribed` webhook. Set on fireflies.ai's webhook
+    #: settings page; empty means deliveries are rejected, not trusted.
+    fireflies_webhook_secret: str = ""
+
+    # Feedback generation — any OpenRouter model id works; Gemini Flash is the
+    # cheap default (a six-person hour costs a fraction of a rupee), the same
+    # tier algoholic uses for its learner-facing review feedback. Swappable
+    # from .env without touching code, which is the point of OpenRouter here.
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    feedback_model: str = "google/gemini-2.5-flash"
+
     # Pricing
     #: The currencies checkout is offered in. USD is the base price list and the
     #: floor everything falls back to, so it is always included whether or not
@@ -163,6 +180,16 @@ class Settings(BaseSettings):
     @property
     def slack_configured(self) -> bool:
         return bool(self.slack_webhook_url)
+
+    @property
+    def fireflies_configured(self) -> bool:
+        """No key means no bot is dispatched and webhooks are rejected —
+        sessions simply run without transcripts, as they did before."""
+        return bool(self.fireflies_api_key)
+
+    @property
+    def feedback_configured(self) -> bool:
+        return bool(self.openrouter_api_key)
 
     @property
     def storage_configured(self) -> bool:

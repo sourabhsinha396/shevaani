@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { company } from "@/lib/company";
 
 /**
- * Deliberately open to people without an account — a payment provider reviewing
+ * Deliberately open to people without an account - a payment provider reviewing
  * the site has to be able to reach us, and so does someone whose problem *is*
  * that they cannot sign in. Signed-in visitors get the fields filled in and the
  * message linked to their account.
@@ -28,7 +29,7 @@ export default function ContactPage() {
     body: "",
   });
 
-  // The auth state resolves after the first paint, so fill in once it arrives —
+  // The auth state resolves after the first paint, so fill in once it arrives -
   // without clobbering anything already typed.
   React.useEffect(() => {
     if (!user) return;
@@ -109,7 +110,7 @@ export default function ContactPage() {
                 <Input
                   required
                   maxLength={200}
-                  placeholder="Credit for Tuesday's discussion"
+                  placeholder="Question Regarding ..."
                   value={form.subject}
                   onChange={(e) => update("subject", e.target.value)}
                 />
@@ -144,10 +145,54 @@ export default function ContactPage() {
 
       <p className="text-muted-foreground mt-8 text-sm text-pretty">
         Cancelling a session yourself is usually faster, and the credits come
-        straight back — the rules are on the{" "}
+        straight back - the rules are on the{" "}
         <Link href="/refunds">cancellation policy</Link> page, and your bookings
         are under <Link href="/dashboard">My sessions</Link>.
       </p>
+
+      {/* The details Razorpay's account review expects to find on the site.
+          Values come from env (see lib/company.ts); an empty one is skipped
+          rather than rendered as a blank row. */}
+      <div className="border-border/60 mt-10 rounded-xl border p-5">
+        <h2 className="text-foreground text-xs font-medium tracking-[0.15em] uppercase">
+          Company details
+        </h2>
+        <dl className="text-muted-foreground mt-4 flex flex-col gap-2 text-sm">
+          <div className="flex gap-3">
+            <dt className="w-20 shrink-0">Business</dt>
+            <dd className="text-foreground">{company.legalName}</dd>
+          </div>
+          {company.address && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0">Address</dt>
+              <dd>{company.address}</dd>
+            </div>
+          )}
+          {company.phone && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0">Phone</dt>
+              <dd>
+                <a href={`tel:${company.phone.replace(/\s+/g, "")}`}>
+                  {company.phone}
+                </a>
+              </dd>
+            </div>
+          )}
+          {company.supportEmail && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0">Email</dt>
+              <dd>
+                <a
+                  className="underline underline-offset-4"
+                  href={`mailto:${company.supportEmail}`}
+                >
+                  {company.supportEmail}
+                </a>
+              </dd>
+            </div>
+          )}
+        </dl>
+      </div>
     </div>
   );
 }

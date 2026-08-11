@@ -9,7 +9,7 @@
  * The script is fetched the first time somebody actually chooses Razorpay, not
  * on page load. It is a third-party script on a page that renders prices and a
  * signed-in balance; loading it for the majority who will pay by card would be
- * a request — and a set of cookies — bought for nothing.
+ * a request - and a set of cookies - bought for nothing.
  *
  * **Nothing the modal returns is trusted.** The handler's payload is checked
  * server-side against a fresh fetch of the order (see `billing.verify_payment`),
@@ -66,7 +66,7 @@ function load(): Promise<void> {
 /**
  * The public half of the order, as `create_checkout` built it.
  *
- * Everything in here reaches the browser, so everything in here is public — no
+ * Everything in here reaches the browser, so everything in here is public - no
  * key secret, and no amount that matters: Razorpay charges what the *order*
  * says, not what this payload was handed.
  */

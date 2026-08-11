@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 
 /**
  * Opened from an email, which means it usually lands in whichever browser the
- * mail app chose — often not the one holding the session. So this page does not
+ * mail app chose - often not the one holding the session. So this page does not
  * require a signed-in user: the token is the proof. If a session happens to be
  * present, it is refreshed so the banner disappears immediately.
  */
@@ -27,7 +27,7 @@ function VerifyEmail() {
   React.useEffect(() => {
     if (!token) {
       setState("failed");
-      setMessage("That link is incomplete — copy the whole one out of the email.");
+      setMessage("That link is incomplete - copy the whole one out of the email.");
       return;
     }
     let cancelled = false;
@@ -85,7 +85,7 @@ function VerifyEmail() {
         <p className="font-medium">Couldn&apos;t confirm that link</p>
         <p className="text-muted-foreground mt-1 text-pretty">{message}</p>
         <p className="text-muted-foreground mt-3 text-pretty">
-          Nothing is broken — your account works either way. Sign in and send
+          Nothing is broken - your account works either way. Sign in and send
           yourself a fresh link from{" "}
           <Link href="/account" className="text-foreground underline underline-offset-4">
             your account

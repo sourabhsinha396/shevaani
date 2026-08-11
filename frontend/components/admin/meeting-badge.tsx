@@ -5,7 +5,7 @@ import type { MeetingStatus } from "@/lib/types";
 
 /**
  * Meet creation is the one part of the system that depends on a third party and
- * can fail quietly, so its state is shown wherever a session is shown — never
+ * can fail quietly, so its state is shown wherever a session is shown - never
  * inferred from the session's own status.
  */
 export function MeetingBadge({

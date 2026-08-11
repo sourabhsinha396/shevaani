@@ -20,6 +20,10 @@ dependencies = [
     "sqladmin>=0.20",
     "itsdangerous>=2.2",
     "httpx>=0.28",
+    # Feedback report generation (services/feedback.py), via OpenRouter's
+    # OpenAI-compatible endpoint. Async client, so it is the one vendor SDK
+    # that gets to run on the event loop.
+    "openai>=1.60",
     # Used only for `Webhook.construct_event`; the checkout call itself is httpx,
     # because the SDK is synchronous. See integrations/payments.py.
     "stripe>=11.1",

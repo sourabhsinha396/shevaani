@@ -22,7 +22,7 @@ export default function ForgotPasswordPage() {
     try {
       await api.forgotPassword(email);
       // The API answers identically for a registered and an unregistered
-      // address, and so does this screen — branching here would hand back the
+      // address, and so does this screen - branching here would hand back the
       // account oracle the endpoint is careful not to be.
       setSent(true);
     } catch (e) {

@@ -24,6 +24,7 @@ from app.models.session import Session, SessionMeeting
 from app.models.user import User
 from app.services import booking as booking_service
 from app.services import scheduling
+from app.services.slugs import slugify, unique_session_slug
 from app.services.errors import Conflict, DomainError, NotFound, PermissionDenied, SchedulingError
 from app.services.scheduling import utc_now
 
@@ -48,6 +49,7 @@ async def create_group_session(
     min_seats: int,
     max_seats: int,
     price_credits: int,
+    slug: str | None = None,
     topic: str | None = None,
     description: str | None = None,
     prep_material_url: str | None = None,
@@ -72,9 +74,14 @@ async def create_group_session(
         db, instructor_id, starts_at, ends_at, one_on_one=False
     )
 
+    # A sent slug is normalised and de-duplicated exactly like a derived one,
+    # so whatever the admin typed still ends up unique and URL-safe.
+    slug = await unique_session_slug(db, slug if slug else title)
+
     session = Session(
         status=SessionStatus.PUBLISHED if publish else SessionStatus.DRAFT,
         title=title,
+        slug=slug,
         topic=topic,
         description=description,
         prep_material_url=prep_material_url,
@@ -103,6 +110,7 @@ async def update_group_session(
     session: Session,
     *,
     title: str | None = None,
+    slug: str | None = None,
     topic: str | None = None,
     description: str | None = None,
     prep_material_url: str | None = None,
@@ -129,6 +137,9 @@ async def update_group_session(
 
     if title is not None:
         session.title = title
+    if slug is not None and slugify(slug) != session.slug:
+        # Deliberate URL move. Old shared links 404 from here on.
+        session.slug = await unique_session_slug(db, slug, exclude_id=session.id)
     if topic is not None:
         session.topic = topic
     if description is not None:

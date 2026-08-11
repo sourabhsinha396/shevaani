@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * A month grid whose cells are calendar dates and nothing else.
  *
  * Everything here works on `YYYY-MM-DD` strings built with `Date.UTC`, never on
- * a local `Date`. A cell is a *civil date* — "the 11th of August" — and the
+ * a local `Date`. A cell is a *civil date* - "the 11th of August" - and the
  * moment you construct one as `new Date(2026, 7, 11)` it becomes an instant in
  * the browser's zone, which is the wrong zone for a calendar the reader has just
  * told us to draw in Sydney. The parent decides which dates are bookable; this
@@ -68,7 +68,7 @@ export function BookingCalendar({
   onSelect: (key: string) => void;
   /** The dates with at least one open slot, as `YYYY-MM-DD` in the reader's zone. */
   available: Set<string>;
-  /** Today's date in the reader's zone — not the browser's. */
+  /** Today's date in the reader's zone - not the browser's. */
   today: string;
   loading?: boolean;
 }) {

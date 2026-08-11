@@ -42,7 +42,7 @@ from app.integrations.payments import WebhookEnvelope
 from app.models.billing import CreditPack, Payment, WebhookEvent
 from app.models.enums import CreditReason, PaymentProvider, PaymentStatus
 from app.models.user import User
-from app.services import credits, notifications, pricing
+from app.services import credits, notifications, pricing, referrals
 from app.services.errors import DomainError, NotFound
 from app.services.scheduling import utc_now
 
@@ -362,6 +362,13 @@ async def settle_paid(
         payment_id=payment.id,
         note=f"{payment.credits} credits via {payment.provider.value}",
     )
+
+    # The buyer's first settled payment is what "enrolled" means for the
+    # referral program — if somebody's link brought them here, that person's
+    # free session is granted now. A no-op for everyone unreferred, and
+    # exactly-once for everyone else: the referral row is check-and-set under
+    # its own lock, so the webhook/verify race settled above cannot pay twice.
+    await referrals.credit_enrollment(db, payment.user_id)
 
     await notifications.credit_receipt(db, payment)
     await slack.dispatch(

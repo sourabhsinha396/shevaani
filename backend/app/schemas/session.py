@@ -24,6 +24,9 @@ class SessionOut(ORMModel):
     """
 
     id: uuid.UUID
+    #: URL identity — what ``/discussions/<slug>`` uses instead of the UUID.
+    #: None for one-to-ones, which have no public catalogue page to be at.
+    slug: str | None
     #: Group or one-to-one. Serialised because a client cannot infer it — a
     #: group discussion with one seat left, and a 1:1, are not the same thing
     #: even though ``max_seats`` can be 1 for both.
@@ -58,6 +61,9 @@ class SessionAdminOut(SessionOut):
 class GroupSessionCreateIn(BaseModel):
     instructor_id: uuid.UUID
     title: str = Field(min_length=1, max_length=200)
+    #: Omitted → derived from the title server-side. Sent → normalised and
+    #: de-duplicated the same way, so the admin form can show what it will be.
+    slug: str | None = Field(default=None, max_length=250)
     topic: str | None = Field(default=None, max_length=200)
     description: str | None = None
     prep_material_url: str | None = None
@@ -83,6 +89,8 @@ class GroupSessionCreateIn(BaseModel):
 
 class GroupSessionUpdateIn(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
+    #: Changing it moves the URL — old shared links 404. Allowed, but on purpose.
+    slug: str | None = Field(default=None, min_length=1, max_length=250)
     topic: str | None = Field(default=None, max_length=200)
     description: str | None = None
     prep_material_url: str | None = None

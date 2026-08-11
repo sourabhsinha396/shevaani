@@ -12,7 +12,7 @@ import { formatDateTime } from "@/lib/utils";
 /**
  * Who is in the session, and the attendance controls.
  *
- * Shared by the superuser session page and the instructor's own list — the two
+ * Shared by the superuser session page and the instructor's own list - the two
  * must never disagree about who is on the list, so they render the same
  * component over the same payload. Only the endpoint behind `onConfirm`
  * differs, because the instructor's version is scoped to their own sessions
@@ -128,8 +128,8 @@ export function RosterPanel({
               <Card key={entry.booking_id}>
                 <CardContent className="flex items-center justify-between gap-4 text-sm">
                   <span>{entry.name}</span>
-                  {/* No credit is taken for a waitlist place — it is charged on
-                      promotion — so there is nothing to refund here. */}
+                  {/* No credit is taken for a waitlist place - it is charged on
+                      promotion - so there is nothing to refund here. */}
                   <span className="text-muted-foreground">#{entry.position}</span>
                 </CardContent>
               </Card>

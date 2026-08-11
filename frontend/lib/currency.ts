@@ -16,7 +16,7 @@
  * only ever appears after hydration, so there is no mismatch to warn about.
  *
  * None of this decides what anyone is charged. The browser sends a currency
- * code, and the backend re-quotes the price from the pack's USD base — see
+ * code, and the backend re-quotes the price from the pack's USD base - see
  * `backend/app/services/pricing.py`. The worst a tampered value can do is buy at
  * a different price we already publish.
  */
@@ -47,7 +47,7 @@ export function isSupportedCurrency(value: string | null | undefined): value is 
    through to USD, which is a price we can charge, rather than to a guess we
    would then have to refuse at checkout. */
 const ZONE_COUNTRY: Record<string, string> = {
-  // India — both spellings are in the wild; Asia/Calcutta is the older alias
+  // India - both spellings are in the wild; Asia/Calcutta is the older alias
   // and still what some Windows installs report.
   "Asia/Kolkata": "IN",
   "Asia/Calcutta": "IN",
@@ -87,8 +87,8 @@ const ZONE_COUNTRY: Record<string, string> = {
   "Europe/San_Marino": "SM",
   "Europe/Vatican": "VA",
 
-  // United States. Mapping these buys no currency change — USD is the floor
-  // anyway — but it is what lets a US signup record a country.
+  // United States. Mapping these buys no currency change - USD is the floor
+  // anyway - but it is what lets a US signup record a country.
   "America/New_York": "US",
   "America/Detroit": "US",
   "America/Chicago": "US",
@@ -118,7 +118,7 @@ const COUNTRY_CURRENCY: Record<string, Currency> = {
 export function countryFromTimeZone(timeZone: string): string | null {
   if (ZONE_COUNTRY[timeZone]) return ZONE_COUNTRY[timeZone];
   // Every Australia/* zone is Australia, so the prefix is exact rather than a
-  // guess — which is not true of, say, America/* or Europe/*.
+  // guess - which is not true of, say, America/* or Europe/*.
   if (timeZone.startsWith("Australia/")) return "AU";
   if (timeZone === "Pacific/Auckland") return "NZ";
   return null;
@@ -145,8 +145,8 @@ export function browserTimeZone(): string {
   }
 }
 
-/** What to record on a new account. Not load-bearing — the currency decides the
- *  price and the gateway — so `null` when we cannot place the zone is fine. */
+/** What to record on a new account. Not load-bearing - the currency decides the
+ *  price and the gateway - so `null` when we cannot place the zone is fine. */
 export function detectCountry(): string | null {
   return countryFromTimeZone(browserTimeZone());
 }
@@ -169,7 +169,7 @@ export function writeCurrencyCookie(currency: Currency): void {
  * A saved choice, then the timezone, then USD.
  *
  * The cookie is only written when somebody picks from the switcher, so
- * detection re-runs on every visit for everyone who never touched it — which is
+ * detection re-runs on every visit for everyone who never touched it - which is
  * what a learner who has moved country would want, and what someone who
  * overrode us explicitly would not.
  */

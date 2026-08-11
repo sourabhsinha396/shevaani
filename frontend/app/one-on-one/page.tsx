@@ -63,7 +63,7 @@ function formatDateKey(key: string): string {
  * The times come from `/instructors/availability`, which is the union of what
  * everyone on the team can take; who teaches the hour is decided by the server
  * when the booking is made. That is the whole reason this page can look like a
- * calendar instead of a form — there is only one question on it.
+ * calendar instead of a form - there is only one question on it.
  *
  * **Slots are regrouped by the reader's zone**, not served that way. The API
  * keys days by IST because that is the zone the booking window is defined in,
@@ -97,7 +97,7 @@ export default function OneOnOnePage() {
   }, [timeZone]);
 
   // Detection can land the reader a day behind IST, and on the 1st that is a
-  // whole month behind. Snap forward, never back — otherwise browsing to
+  // whole month behind. Snap forward, never back - otherwise browsing to
   // September and changing zone would yank the calendar home.
   React.useEffect(() => {
     const current = monthOf(today);
@@ -162,7 +162,7 @@ export default function OneOnOnePage() {
 
   // The month request can only say "nothing in *this* month". Distinguishing
   // that from "nothing at all" needs the wider horizon, and a probe that failed
-  // (`null`) must not be read as closed — hence the explicit `has_slots` test.
+  // (`null`) must not be read as closed - hence the explicit `has_slots` test.
   const summary = useOneOnOneAvailability();
   const closedOutright = summary !== null && !summary.has_slots;
 
@@ -190,7 +190,7 @@ export default function OneOnOnePage() {
           <div className="p-6">
             <div className="flex flex-wrap items-center gap-1.5 pb-6">
               {/* With nothing to choose between, the row states the length
-                  rather than offering it — a toggle that cannot toggle still
+                  rather than offering it - a toggle that cannot toggle still
                   takes a tab stop and announces itself as pressable. */}
               {DURATIONS.length === 1 ? (
                 <span className="text-muted-foreground rounded-full border border-border/60 px-3 py-1 text-sm">
@@ -282,7 +282,7 @@ export default function OneOnOnePage() {
                         >
                           Browse group discussions
                         </Link>{" "}
-                        instead — they come out of the same balance.
+                        instead - they come out of the same balance.
                       </p>
                     </>
                   ) : (

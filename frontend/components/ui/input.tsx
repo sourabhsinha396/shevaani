@@ -13,7 +13,7 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return <textarea data-slot="textarea" className={cn(fieldStyles, "min-h-20 field-sizing-content", className)} {...props} />;
 }
 
-/** Native select — no extra Radix dependency, and it behaves correctly on mobile. */
+/** Native select - no extra Radix dependency, and it behaves correctly on mobile. */
 function Select({ className, children, ...props }: React.ComponentProps<"select">) {
   return (
     <select data-slot="select" className={cn(fieldStyles, "h-10 pr-8", className)} {...props}>

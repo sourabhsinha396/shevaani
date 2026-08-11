@@ -27,7 +27,7 @@ from app.core.security import hash_password
 from app.models.billing import CreditPack
 from app.models.enums import CreditReason, UserRole
 from app.models.user import User
-from app.services import backups, credits, pricing
+from app.services import backups, credits, pricing, referrals
 
 
 class _EmailCheck(BaseModel):
@@ -61,6 +61,9 @@ async def _upsert_user(email: str, full_name: str, password: str, role: UserRole
                 full_name=full_name,
                 password_hash=hash_password(password),
                 role=role,
+                # NOT NULL for everyone — staff have referral links too, they
+                # just don't advertise them.
+                referral_code=await referrals.unique_code(db),
             )
             db.add(user)
             action = "Created"

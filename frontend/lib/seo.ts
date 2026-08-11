@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { config } from "./config";
+import { richTextToPlain } from "./rich-text";
 import type { DiscussionSession } from "./types";
 
 /**
@@ -11,9 +13,9 @@ import type { DiscussionSession } from "./types";
  * event, and the parts of it search engines legitimately want are the parts a
  * stranger deciding whether to book would want:
  *
- *   indexable — title, topic, description, start time, duration, price in
+ *   indexable - title, topic, description, start time, duration, price in
  *               credits
- *   not       — instructor identity, seat counts, waitlist position, anything
+ *   not       - instructor identity, seat counts, waitlist position, anything
  *               about who has booked, and above all the join URL
  *
  * The instructor is left out because a public page tying a named person to a
@@ -22,16 +24,14 @@ import type { DiscussionSession } from "./types";
  * fact is stale within the hour and reads as pressure copy when it isn't true.
  *
  * The join URL is a bearer credential. It is never in a serialiser, never in an
- * email, and never in a page — the hard rule from PLAN, restated here because
+ * email, and never in a page - the hard rule from PLAN, restated here because
  * this is the file where somebody would be tempted to break it.
  */
 
 /** Absolute, no trailing slash. Every canonical and sitemap entry is built off it. */
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
-).replace(/\/+$/, "");
+export const SITE_URL = config.siteUrl;
 
-export const SITE_NAME = "Shevaani";
+export const SITE_NAME = config.appName;
 
 /**
  * Trailing slashes: **no**, matching Next's default.
@@ -51,6 +51,7 @@ export const PRIVATE_PATHS = [
   "/admin",
   "/instructor",
   "/dashboard",
+  "/referrals",
   "/checkout",
   "/login",
   "/register",
@@ -63,7 +64,7 @@ interface PageMeta {
   description: string;
   path: string;
   /** Signed-in surfaces opt out of indexing rather than relying on robots.txt
-   *  alone — robots.txt asks crawlers not to fetch, this tells the ones that
+   *  alone - robots.txt asks crawlers not to fetch, this tells the ones that
    *  found the URL anyway not to list it. */
   noindex?: boolean;
 }
@@ -120,7 +121,10 @@ export function discussionJsonLd(session: DiscussionSession) {
     "@context": "https://schema.org",
     "@type": "Event",
     name: session.title,
-    description: session.description ?? session.topic ?? undefined,
+    // Rich text in storage, plain text in structured data.
+    description: session.description
+      ? richTextToPlain(session.description)
+      : (session.topic ?? undefined),
     startDate: session.starts_at,
     endDate: session.ends_at,
     eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
@@ -131,10 +135,10 @@ export function discussionJsonLd(session: DiscussionSession) {
     inLanguage: "en",
     location: {
       "@type": "VirtualLocation",
-      url: canonical(`/discussions/${session.id}`),
+      url: canonical(`/discussions/${session.slug ?? session.id}`),
     },
     organizer: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
-    // Credits, not currency. Marking this up as a money price would be a lie —
+    // Credits, not currency. Marking this up as a money price would be a lie -
     // a session costs credits, and credits are bought separately.
     isAccessibleForFree: false,
     typicalAgeRange: "16-",

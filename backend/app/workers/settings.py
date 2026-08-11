@@ -9,6 +9,10 @@ from app.core.config import settings
 from app.workers.jobs import (
     auto_cancel_underfilled_sessions,
     backup_database,
+    dispatch_notetakers,
+    finalize_session_feedback,
+    generate_session_feedback,
+    ingest_fireflies_transcript,
     mark_sessions_completed,
     post_slack_message,
     remove_session_meeting,
@@ -16,6 +20,7 @@ from app.workers.jobs import (
     send_email,
     send_session_reminders,
     sweep_expired_holds,
+    sweep_review_transcripts,
     sync_session_meeting,
 )
 
@@ -28,6 +33,10 @@ logging.basicConfig(level=logging.INFO)
 #: pg_dump of a growing database will not finish inside the 60s default, and a
 #: backup killed halfway is worse than none — it looks like one until restored.
 _BACKUP_TIMEOUT = 1800
+
+#: One model call over a full hour's transcript. Minutes, not seconds — the
+#: 60s job default would kill every generation mid-flight.
+_FEEDBACK_TIMEOUT = 600
 
 
 class WorkerSettings:
@@ -43,6 +52,11 @@ class WorkerSettings:
         send_session_reminders,
         send_email,
         post_slack_message,
+        dispatch_notetakers,
+        ingest_fireflies_transcript,
+        sweep_review_transcripts,
+        func(generate_session_feedback, timeout=_FEEDBACK_TIMEOUT),
+        func(finalize_session_feedback, timeout=_FEEDBACK_TIMEOUT),
         # One attempt. A backup that failed for a real reason — no disk, bad
         # credentials, a dead bucket — fails identically five times, and each
         # one posts to Slack. Tomorrow's run is the retry.
@@ -55,6 +69,12 @@ class WorkerSettings:
         cron(sweep_expired_holds, minute={5, 35}),
         cron(retry_pending_meetings, minute={10, 40}),
         cron(mark_sessions_completed, minute={20, 50}),
+        # Every two minutes: `addToLiveMeeting` only works while the meeting
+        # is live, so the bot must go in shortly after starts_at. The dispatch
+        # window (15 min) tolerates a few missed ticks.
+        cron(dispatch_notetakers, minute=set(range(0, 60, 2))),
+        # The admin-review loop: sqladmin edits can't enqueue jobs, this can.
+        cron(sweep_review_transcripts, minute={8, 38}),
         # Every ten minutes, against a twenty-minute lateness tolerance, so a
         # brief worker outage delays a reminder rather than losing it. Sending
         # twice is prevented by `session_reminders`, not by this schedule.

@@ -6,13 +6,15 @@ import {
   jsonLdScript,
   pageMetadata,
 } from "@/lib/seo";
+import { config } from "@/lib/config";
+import { richTextToPlain } from "@/lib/rich-text";
 import type { DiscussionSession } from "@/lib/types";
 
 /**
  * Per-session metadata and `Event` structured data.
  *
- * The page under this is a client component — it books, cancels, and reads the
- * signed-in learner's status — so the crawlable half lives here, fetched
+ * The page under this is a client component - it books, cancels, and reads the
+ * signed-in learner's status - so the crawlable half lives here, fetched
  * server-side with no cookie. That is not a workaround, it is the point: what
  * this layout can see is exactly what an anonymous visitor can see, which is
  * exactly what belongs in the markup.
@@ -21,13 +23,13 @@ import type { DiscussionSession } from "@/lib/types";
  * anything join-related. See `lib/seo.ts` for the reasoning.
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API = config.apiUrl;
 
 async function fetchSession(id: string): Promise<DiscussionSession | null> {
   try {
     const response = await fetch(`${API}/api/v1/sessions/${id}`, {
       // A session's seat state changes constantly, but nothing seat-related is
-      // rendered here — five minutes is plenty for a title and a start time,
+      // rendered here - five minutes is plenty for a title and a start time,
       // and it keeps a crawl from hammering the API.
       next: { revalidate: 300 },
     });
@@ -64,12 +66,16 @@ export async function generateMetadata({
 
   return pageMetadata({
     title: session.title,
-    description:
-      session.description?.slice(0, 160) ??
-      `An English discussion on ${when} IST. Six learners at most, and everyone speaks.`,
-    path: `/discussions/${session.id}`,
+    description: session.description
+      ? // Descriptions are rich text; a meta description with `<p>` in it
+        // reads as a broken site in the search snippet.
+        richTextToPlain(session.description).slice(0, 160)
+      : `An English discussion on ${when} IST. Six learners at most, and everyone speaks.`,
+    // Canonicalise on the slug even when the visitor arrived by UUID - one
+    // URL per session as far as crawlers are concerned.
+    path: `/discussions/${session.slug ?? session.id}`,
     // A cancelled session's page still exists so a learner following an old
-    // link learns what happened — but it has no business in search results.
+    // link learns what happened - but it has no business in search results.
     noindex: session.status !== "published",
   });
 }

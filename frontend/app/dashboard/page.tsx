@@ -16,31 +16,22 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { InviteFriends } from "@/components/invite-friends";
 import { useSiteConfig } from "@/components/site-config-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
-import { sessionBalanceLabel, sessionDeltaLabel } from "@/lib/pricing";
-import type { BookingWithSession, LedgerEntry } from "@/lib/types";
+import { sessionBalanceLabel } from "@/lib/pricing";
+import type { BookingWithSession } from "@/lib/types";
 import { durationMinutes, formatDateTime, relativeToNow } from "@/lib/utils";
 
 /** Matches JOIN_WINDOW_BEFORE_MINUTES on the API. Nothing is gated on it any
- *  more — it is only how long before the hour the instructor is expected. */
+ *  more - it is only how long before the hour the instructor is expected. */
 const STARTING_SOON_MINUTES = 15;
 
-const LEDGER_LABEL: Record<string, string> = {
-  purchase: "Sessions bought",
-  booking_spend: "Booked a session",
-  booking_refund: "Cancelled in time — returned",
-  session_cancelled: "Session cancelled — returned",
-  admin_grant: "Granted by Shevaani",
-  admin_revoke: "Adjusted by Shevaani",
-  signup_bonus: "Welcome bonus",
-};
-
 function isOneOnOne(booking: BookingWithSession) {
-  // From the API, not inferred from seat counts — a group discussion can
+  // From the API, not inferred from seat counts - a group discussion can
   // legitimately have a single seat, and calling that a 1:1 would be wrong.
   return booking.session.kind === "one_on_one";
 }
@@ -74,7 +65,7 @@ function VerifyBanner() {
             {/* Nothing here is blocked by an unconfirmed address, and saying
                 otherwise to force the click would be untrue. */}
             <strong>{user.email}</strong> isn&apos;t confirmed yet. Booking still
-            works — but reminders and joining links may not reach you.
+            works - but reminders and joining links may not reach you.
           </p>
         </div>
         {notice ? (
@@ -92,7 +83,7 @@ function VerifyBanner() {
 
 /** The link itself, in full, plus the one thing people worry about when they
  *  get it days early: that arriving before the instructor means nothing is
- *  wrong. Shown rather than fetched — see the note on `recordJoin`. */
+ *  wrong. Shown rather than fetched - see the note on `recordJoin`. */
 function JoinPanel({
   joinUrl,
   instructorName,
@@ -134,9 +125,8 @@ function JoinPanel({
       </div>
 
       <p className="text-muted-foreground mt-3 text-sm text-pretty">
-        Open it whenever you like — it is the same link every time. Arrive early
-        and you&apos;ll wait in a short lobby: the room only opens once{" "}
-        {instructorName} is there.
+        We recommend joining atleast 5 minutes early: The moderator{" "}
+        ({instructorName}) will give you a heads-up and the session will start on time.
       </p>
 
       <Button variant="brand" size="sm" className="mt-3" asChild>
@@ -152,9 +142,9 @@ function JoinPanel({
  *  different things to tell someone, and only one of them is worth waiting on. */
 function missingLinkNotice(booking: BookingWithSession) {
   if (booking.meeting_status === "failed") {
-    return "We couldn't set up the video room for this one. We know, and we're fixing it — if the link still isn't here the day before, write to us and we'll sort it out.";
+    return "We couldn't set up the video session for this one. We know, and we're fixing it - if the link still isn't here the day before, write to us and we'll sort it out.";
   }
-  return "The Meet link is being created — it usually lands within a minute of booking. Refresh this page and it should be here.";
+  return "The Meet link is being created - it usually lands within a minute of booking. Refresh this page and it should be here.";
 }
 
 function BookingCard({
@@ -209,12 +199,12 @@ function BookingCard({
             </p>
             <p className="mt-1">
               {durationMinutes(booking.starts_at, booking.ends_at)} min
-              {!past && ` · ${relativeToNow(booking.starts_at)}`} · with{" "}
-              {session.instructor.full_name}
+              {!past && ` · ${relativeToNow(booking.starts_at)}`} 
+              {/* · with{" "} {session.instructor.full_name} */}
             </p>
             {waitlisted && (
               <p className="mt-1">
-                Nothing taken yet — you&apos;re charged only if a seat opens.
+                Nothing taken yet - you&apos;re charged only if a seat opens.
               </p>
             )}
           </div>
@@ -227,6 +217,17 @@ function BookingCard({
               onClick={() => onCancel(booking)}
             >
               Cancel
+            </Button>
+          )}
+          {/* "confirmed" too: attendance often isn't marked, but the feedback
+              page only shows what was actually published for them. */}
+          {past && ["attended", "confirmed"].includes(booking.status) && !isOneOnOne(booking) && (
+            <Button asChild variant="outline" size="sm">
+              {/* The session's own feedback page - slug-addressed, so the URL
+                  is shareable and readable. */}
+              <Link href={`/dashboard/feedback/${session.slug ?? booking.session_id}`}>
+                View feedback
+              </Link>
             </Button>
           )}
         </div>
@@ -255,6 +256,10 @@ function BookingCard({
               {missingLinkNotice(booking)}
             </p>
           ))}
+
+        {!past && !waitlisted && (
+          <InviteFriends session={session} timezone={timezone} />
+        )}
       </CardContent>
     </Card>
   );
@@ -279,11 +284,11 @@ function CancelConfirm({
       <CardContent className="flex flex-col gap-4 text-sm">
         <div>
           <p className="font-medium">Cancel “{booking.session.title}”?</p>
-          {/* The policy, said before the button rather than after — and the two
+          {/* The policy, said before the button rather than after - and the two
               cases genuinely differ, so this is not boilerplate. */}
           <p className="text-muted-foreground mt-1 text-pretty">
             {booking.credits_spent === 0
-              ? "You haven't been charged for this — leaving the waitlist costs nothing."
+              ? "You haven't been charged for this - leaving the waitlist costs nothing."
               : refunded
                 ? "It starts in over 12 hours, so it goes straight back on your balance."
                 : "It starts in under 12 hours, so it will not come back. The seat was held for you and the group is small."}
@@ -310,7 +315,6 @@ export default function DashboardPage() {
 
   const [upcoming, setUpcoming] = React.useState<BookingWithSession[]>([]);
   const [past, setPast] = React.useState<BookingWithSession[]>([]);
-  const [ledger, setLedger] = React.useState<LedgerEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState<BookingWithSession | null>(null);
@@ -322,11 +326,10 @@ export default function DashboardPage() {
 
   const load = React.useCallback(async () => {
     try {
-      const [ahead, all, entries] = await Promise.all([
+      const [ahead, all] = await Promise.all([
         api.myBookings(true),
         // `upcoming=false` returns everything, so past is the difference.
         api.myBookings(false),
-        api.creditLedger(),
       ]);
       const aheadIds = new Set(ahead.map((b) => b.id));
       setUpcoming(ahead);
@@ -335,7 +338,6 @@ export default function DashboardPage() {
           .filter((b) => !aheadIds.has(b.id))
           .sort((a, b) => b.starts_at.localeCompare(a.starts_at)),
       );
-      setLedger(entries);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -348,7 +350,7 @@ export default function DashboardPage() {
     if (user) void load();
   }, [user, load]);
 
-  /** The link is already opening by the time this runs — the anchor did that,
+  /** The link is already opening by the time this runs - the anchor did that,
    *  and it has to, or the browser would treat a post-fetch `window.open` as a
    *  popup. All this does is tell the API that somebody went, which is what
    *  writes the audit row and the automatic attendance signal. A failure here
@@ -388,7 +390,11 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl tracking-tight">My sessions</h1>
           <p className="text-muted-foreground mt-2 max-w-xl text-pretty">
-            Your upcoming sessions, your past sessions, and the full history of your balance.
+            Your upcoming and past sessions. Your balance history lives on{" "}
+            <Link href="/account" className="text-foreground underline underline-offset-4">
+              your account
+            </Link>
+            .
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -478,48 +484,6 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
-
-      <section className="mt-12">
-        <h2 className="text-xl tracking-tight">Your balance</h2>
-        <p className="text-muted-foreground mt-1 text-sm text-pretty">
-          The sum of everything below. Nothing is ever edited or removed, so
-          this is the full story of every session you have bought and spent.
-        </p>
-        <Card className="mt-4">
-          <CardContent className="flex flex-col divide-y text-sm">
-            {ledger.length === 0 && (
-              <p className="text-muted-foreground py-6 text-center">
-                Nothing here yet.{" "}
-                <Link href="/checkout" className="text-foreground underline underline-offset-4">
-                  Buy some
-                </Link>
-                .
-              </p>
-            )}
-            {ledger.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <div>
-                  <p>{LEDGER_LABEL[entry.reason] ?? entry.reason}</p>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    {formatDateTime(entry.created_at, user?.timezone)}
-                    {entry.note ? ` · ${entry.note}` : ""}
-                  </p>
-                </div>
-                <span
-                  className={
-                    entry.delta > 0 ? "text-[var(--success)]" : "text-muted-foreground"
-                  }
-                >
-                  {sessionDeltaLabel(entry.delta)}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
 
       {past.length > 0 && (
         <section className="mt-12">

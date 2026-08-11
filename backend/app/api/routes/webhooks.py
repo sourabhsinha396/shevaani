@@ -28,10 +28,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Header, Request
 
 from app.api.deps import DbSession
+from app.integrations import fireflies, slack
 from app.integrations import payments as payment_integrations
-from app.integrations import slack
 from app.integrations.payments import InvalidSignature
 from app.services import billing
+from app.workers import queue
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -66,6 +67,38 @@ async def razorpay_webhook(
         raise
 
     return {"status": await billing.handle_webhook(db, envelope)}
+
+
+@router.post("/fireflies")
+async def fireflies_webhook(
+    request: Request,
+    x_hub_signature: str | None = Header(default=None, alias="X-Hub-Signature"),
+) -> dict[str, str]:
+    """Fireflies announcing that a meeting's transcript is ready.
+
+    Not money, but the same shape as the payment hooks: verify the raw bytes,
+    then 200 for everything we understood — including events we ignore —
+    because 200 is what stops the retries. The payload is thin (an event name
+    and a transcript id); the transcript itself is fetched by the worker, so
+    a forged id could only make us fetch a transcript we then fail to match.
+    """
+    raw = await request.body()
+    try:
+        fireflies.verify_webhook(raw, x_hub_signature)
+    except InvalidSignature as exc:
+        await _report_rejection("fireflies", exc.message)
+        raise
+
+    payload = await request.json()
+    # v2 sends {"event": "meeting.transcribed", "meeting_id": ...}; v1 sent
+    # {"eventType": "Transcription completed", "meetingId": ...}. Accept both.
+    event = payload.get("event") or payload.get("eventType") or ""
+    transcript_id = payload.get("meeting_id") or payload.get("meetingId")
+    if not transcript_id or "transcri" not in event.lower():
+        return {"status": "ignored"}
+
+    await queue.enqueue("ingest_fireflies_transcript", str(transcript_id))
+    return {"status": "queued"}
 
 
 async def _report_rejection(provider: str, reason: str) -> None:

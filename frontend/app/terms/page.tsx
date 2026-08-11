@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LegalPage } from "@/components/legal-page";
+import { company } from "@/lib/company";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -18,7 +19,7 @@ export default function TermsPage() {
       updated="8 August 2026"
       intro={
         <>
-          These terms cover using Shevaani — the account, the credits, and the
+          These terms cover using Shevaani - the account, the credits, and the
           sessions themselves. Using the service means accepting them. What
           happens to a credit when a session is cancelled has its own page:{" "}
           <Link href="/refunds">cancellations and credits</Link>.
@@ -29,13 +30,20 @@ export default function TermsPage() {
       <p>
         Shevaani is an online English-practice service: small-group discussions
         and one-to-one sessions, held over video with an instructor. Written
-        questions go through the <Link href="/contact">contact form</Link>.
+        questions go through the <Link href="/contact">contact form</Link>
+        {company.supportEmail && (
+          <>
+            {" "}or to{" "}
+            <a href={`mailto:${company.supportEmail}`}>{company.supportEmail}</a>
+          </>
+        )}
+        .
       </p>
 
       <h2>2. Your account</h2>
       <ul>
         <li>
-          You need an account to book. Give a real email address — it is how we
+          You need an account to book. Give a real email address - it is how we
           send session details and how you recover access.
         </li>
         <li>
@@ -68,7 +76,7 @@ export default function TermsPage() {
         </li>
         <li>
           Your balance is the sum of a permanent record of every change to it. If
-          you think it is wrong, ask — we can show you the history.
+          you think it is wrong, ask - we can show you the history.
         </li>
       </ul>
 
@@ -85,7 +93,7 @@ export default function TermsPage() {
         </li>
         <li>
           The joining link becomes available shortly before the start and works
-          only for people booked onto that session. It is personal to you —
+          only for people booked onto that session. It is personal to you -
           passing it on is not permitted, and every use of it is logged.
         </li>
         <li>
@@ -94,7 +102,7 @@ export default function TermsPage() {
         </li>
         <li>
           We do not record sessions. If an instructor ever wants to, they will ask
-          everyone in the room first and you can say no.
+          everyone in the session first and you can say no.
         </li>
       </ul>
 
@@ -117,7 +125,7 @@ export default function TermsPage() {
 
       <h2>7. Your content</h2>
       <p>
-        Anything you write into the service — a profile, a message to us — stays
+        Anything you write into the service - a profile, a message to us - stays
         yours. You give us permission to store and display it only as far as
         running the service needs.
       </p>
@@ -131,7 +139,7 @@ export default function TermsPage() {
         <li>
           We can suspend or close an account that breaks these terms. Where the
           breach is not conduct-related, we will honour the credits on the
-          balance — by letting you spend them before the account closes, or by
+          balance - by letting you spend them before the account closes, or by
           moving them to another account you hold.
         </li>
       </ul>

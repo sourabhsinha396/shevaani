@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Quote } from "lucide-react";
 
 import { Marquee, NumberTicker, Reveal } from "@/components/magicui/effects";
@@ -7,34 +8,34 @@ import { cn } from "@/lib/utils";
 
 /**
  * PLACEHOLDER COPY. These are written to show the layout and the tone; swap
- * them for real quotes before launch. Keep the shape — a name, where they are,
+ * them for real quotes before launch. Keep the shape - a name, where they are,
  * their level, and one specific thing that changed.
  */
 const FEATURED = {
   quote:
-    "I had studied English for nine years and still froze on calls. Two discussions a week for four months and I now run our standup. Nothing about my grammar changed — I just stopped rehearsing sentences before saying them.",
-  name: "Ananya R.",
-  detail: "Product manager · Pune · B1 → B2 in five months",
+    "I had studied English for nine years and still froze on meetings. In about 2 months of serious practice, I became very confident.",
+  name: "Iksha Sinha.",
+  detail: "Product manager · Pune · B1 → B2 in 2 months",
 };
 
 const COLUMNS = [
   [
     {
       quote:
-        "The prep article is the part I underrated. I arrive with three opinions already formed, so I am never the person nodding along.",
-      name: "Marco B.",
-      detail: "Milan · B2",
+        "I was able to qualify for bank PO using the speaking skills I gained here.",
+      name: "Shipra S.",
+      detail: "Bangalore",
     },
     {
       quote:
         "Six people means you cannot hide. That was terrifying in week one and is the whole reason it worked by week four.",
-      name: "Ji-woo K.",
+      name: "Jin-woo K.",
       detail: "Seoul · B1",
     },
     {
       quote:
-        "My instructor noticed I had gone quiet for ten minutes and asked me a question directly. No class has ever done that.",
-      name: "Fatima E.",
+        "My instructor noticed I had gone quiet for ten minutes and motivated me in chat to speak up.",
+      name: "Eduardo Taylor",
       detail: "Casablanca · B2",
     },
   ],
@@ -42,38 +43,42 @@ const COLUMNS = [
     {
       quote:
         "Booked a one-to-one the night before an interview. Fifty minutes of being asked hard questions in English was worth more than a week of revision.",
-      name: "Diego M.",
+      name: "Brendan H.",
       detail: "Bogotá · C1",
     },
     {
       quote:
-        "I like that a session cancels itself when nobody signs up. I have sat through too many half-empty classes elsewhere.",
-      name: "Thanh N.",
-      detail: "Hanoi · B1",
+        "I like the detailed feedback report that we get after each session. Thanks guys",
+      name: "Harsh Raj",
+      detail: "Pune",
+      image: "/images/tesimonials/harsh.png",
     },
     {
       quote:
-        "Accents from five countries in one room. My listening improved faster than my speaking did, which I did not expect.",
-      name: "Elif A.",
-      detail: "Izmir · B2",
+        "Helped me pitch better for my Sales presentations and I got promoted to Senior Associate.",
+      name: "Arihan Prakash",
+      detail: "Lucknow",
     },
   ],
 ];
 
 const PROOF = [
-  { value: 96, suffix: "%", label: "would book again" },
-  { value: 20, suffix: "%", label: "average talk time in a group of four" },
+  { value: 67, suffix: "%", label: "would book again" },
+  { value: 20, suffix: "%", label: "said it helped them on their job" },
 ];
 
 function TestimonialCard({
   quote,
   name,
   detail,
+  image,
   className,
 }: {
   quote: string;
   name: string;
   detail: string;
+  /** A photo, when we have one of the actual person; initials otherwise. */
+  image?: string;
   className?: string;
 }) {
   return (
@@ -85,9 +90,19 @@ function TestimonialCard({
     >
       <blockquote className="text-sm text-pretty">{quote}</blockquote>
       <figcaption className="mt-4 flex items-center gap-3">
-        <span className="bg-secondary text-secondary-foreground grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-medium">
-          {name.slice(0, 2)}
-        </span>
+        {image ? (
+          <Image
+            src={image}
+            alt={name}
+            width={64}
+            height={64}
+            className="bg-secondary size-8 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="bg-secondary text-secondary-foreground grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-medium">
+            {name.slice(0, 2)}
+          </span>
+        )}
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{name}</span>
           <span className="text-muted-foreground block truncate text-xs">
@@ -105,8 +120,8 @@ export function Testimonials() {
       <div className="container-page">
         <Reveal className="max-w-2xl">
           <p className="eyebrow mb-5">What learners say</p>
-          <h2 className="text-4xl text-balance md:text-5xl">
-            The change people report isn&apos;t vocabulary.
+          <h2 className="text-4xl text-balance">
+            Testimonials
           </h2>
         </Reveal>
 

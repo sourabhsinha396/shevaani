@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -102,3 +102,60 @@ class CancellationImpactOut(BaseModel):
 
 class ContactHandledIn(BaseModel):
     note: str | None = Field(default=None, max_length=500)
+
+
+# ------------------------------------------------------------- analytics
+
+
+class AnalyticsDayOut(BaseModel):
+    """One local calendar day (business timezone) of the headline series."""
+
+    date: date
+    signups: int
+    bookings: int
+    payments: int
+
+
+class RevenueByCurrencyOut(BaseModel):
+    """Settled money in one currency, minor units. Deliberately *not* summed
+    across currencies — ₹ plus € is not a number, and pretending it is would
+    put a wrong figure on the most-read screen in the admin."""
+
+    currency: str
+    amount_minor: int
+    payments: int
+
+
+class TopReferrerOut(BaseModel):
+    user_id: uuid.UUID
+    full_name: str
+    email: str
+    joined: int
+    enrolled: int
+    credits_earned: int
+
+
+class AnalyticsTotalsOut(BaseModel):
+    #: All-time headcounts, not windowed — "how big are we" reads wrong scoped
+    #: to a month.
+    learners: int
+    #: Everything below is scoped to the requested window.
+    new_learners: int
+    bookings_confirmed: int
+    bookings_cancelled: int
+    payments_paid: int
+    credits_purchased: int
+    credits_spent: int
+    referrals_joined: int
+    referrals_enrolled: int
+    referral_credits_awarded: int
+
+
+class AnalyticsOut(BaseModel):
+    days: int
+    totals: AnalyticsTotalsOut
+    revenue: list[RevenueByCurrencyOut]
+    series: list[AnalyticsDayOut]
+    #: All-time, because a leaderboard that resets monthly with three users on
+    #: it would mostly be empty.
+    top_referrers: list[TopReferrerOut]

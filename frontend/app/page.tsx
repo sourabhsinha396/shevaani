@@ -2,11 +2,11 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { Faq } from "@/components/home/faq";
+import { FeedbackReport } from "@/components/home/feedback-report";
 import { Features } from "@/components/home/features";
 import { Hero } from "@/components/home/hero";
 import { Pricing } from "@/components/home/pricing";
 import { SessionPreview } from "@/components/home/session-preview";
-import { TalkTime } from "@/components/home/talk-time";
 import { Testimonials } from "@/components/home/testimonials";
 import { Marquee, NumberTicker, Reveal, Ripple } from "@/components/magicui/effects";
 import { Button } from "@/components/ui/button";
@@ -17,14 +17,14 @@ const FOR_WHOM = [
 
 const STATS = [
   { value: 4200, suffix: "+", label: "Sessions run" },
-  { value: 38, suffix: "", label: "Countries" },
-  { value: 96, suffix: "%", label: "Would return" },
+  { value: 8, suffix: "", label: "Countries" },
+  { value: 67, suffix: "%", label: "Would return" },
 ];
 
 const STEPS = [
   { n: "01", title: "Pick a discussion", body: "Browse by topic and time. Book with one session." },
-  { n: "02", title: "Read the prep", body: "A short article and a handful of questions, a day ahead." },
-  { n: "03", title: "Show up and talk", body: "An instructor keeps it moving and everyone gets airtime." },
+  { n: "02", title: "Enroll in it", body: "Confirm your attendance and get ready to participate." },
+  { n: "03", title: "Show up and talk", body: "An moderator will give feedback on your performance." },
 ];
 
 export default function HomePage() {
@@ -66,14 +66,14 @@ export default function HomePage() {
         </dl>
       </section>
 
-      <TalkTime />
+      <FeedbackReport />
 
       {/* -------------------------------------------------- how it works */}
       <section className="section">
         <div className="container-page">
           <Reveal>
             <p className="eyebrow mb-5">How it works</p>
-            <h2 className="text-4xl md:text-5xl">Three steps, then you talk.</h2>
+            <h2 className="text-4xl">Three steps to a GD.</h2>
           </Reveal>
 
           <div className="mt-14 grid gap-10 sm:grid-cols-3">
@@ -99,11 +99,11 @@ export default function HomePage() {
         <Ripple circles={5} base={280} />
 
         <div className="container-page relative flex flex-col items-center gap-6">
-          <h2 className="max-w-xl text-5xl leading-[1.05] text-balance md:text-6xl">
-            Your first discussion is <span className="text-brand-ink">on us.</span>
+          <h2 className="max-w-xl text-4xl leading-[1.05] text-balance">
+            You will not get fluent <span className="text-brand-ink">by studying.</span>
           </h2>
           <p className="text-muted-foreground max-w-md text-pretty">
-            Make an account, claim half your first session free, and join a group tonight.
+            Make an account, and join a group discussion.
           </p>
           <Button asChild size="lg" variant="brand">
             <Link href="/register">

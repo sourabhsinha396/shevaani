@@ -1,3 +1,4 @@
+import { config } from "./config";
 import type { SiteConfig } from "./types";
 
 /**
@@ -15,7 +16,7 @@ import type { SiteConfig } from "./types";
  * itself after hydration. Its own fetch, with its own caching.
  */
 
-/** Every flag on. The answer when the API is unreachable, and — deliberately —
+/** Every flag on. The answer when the API is unreachable, and - deliberately -
  *  when it is unreachable *at build time*, which is the normal case for a fresh
  *  container starting before the backend. Degrading to a working site beats
  *  degrading to a site with its nav emptied out. */
@@ -28,12 +29,12 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
  *  The cost of zero would be making every page on the site dynamically
  *  rendered, for a value that changes a few times a year. A minute between
  *  flipping a switch in `/admin/settings` and seeing it on the public site is
- *  the trade. The admin form itself reads uncached — see `api.adminSiteConfig`. */
+ *  the trade. The admin form itself reads uncached - see `api.adminSiteConfig`. */
 const REVALIDATE_SECONDS = 60;
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE = config.apiUrl;
 
-/** Server components only — it relies on Next's fetch cache, which does not
+/** Server components only - it relies on Next's fetch cache, which does not
  *  exist in the browser. Client components read the same value out of
  *  `useSiteConfig()`, which the root layout seeds from this. */
 export async function getSiteConfig(): Promise<SiteConfig> {
@@ -55,7 +56,7 @@ export async function getSiteConfig(): Promise<SiteConfig> {
 /** One entry per flag, and the only place a flag's prose lives.
  *
  *  `/admin/settings` renders this list, so adding a switch to the admin is a
- *  line here plus the field on `SiteConfig` — there is no per-flag markup to
+ *  line here plus the field on `SiteConfig` - there is no per-flag markup to
  *  write. `key` is typed against `SiteConfig`, so a typo does not compile. */
 export const SITE_FLAGS: {
   key: keyof SiteConfig;
@@ -66,6 +67,6 @@ export const SITE_FLAGS: {
     key: "one_on_one_enabled",
     label: "1:1 sessions",
     description:
-      "Off hides 1:1 from the nav and refuses new bookings. Sessions already booked are untouched — cancel those yourself if that is what you meant. Leaving this on does not force the link to appear: it still hides itself when nobody has an hour free in the next month.",
+      "Off hides 1:1 from the nav and refuses new bookings. Sessions already booked are untouched - cancel those yourself if that is what you meant. Leaving this on does not force the link to appear: it still hides itself when nobody has an hour free in the next month.",
   },
 ];

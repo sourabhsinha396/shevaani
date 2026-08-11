@@ -42,7 +42,7 @@ export default function AdminMessagesPage() {
   async function markHandled(id: string) {
     setBusy(id);
     try {
-      const note = window.prompt("Note (optional) — what did you do about it?");
+      const note = window.prompt("Note (optional) - what did you do about it?");
       await api.adminMarkContactHandled(id, note || undefined);
       await load();
     } catch (e) {

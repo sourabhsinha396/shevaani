@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * One shell, two roles.
  *
  * Superusers run the platform; instructors see their own work and nothing else.
- * The tabs below differ by role, but that is presentation only — every endpoint
+ * The tabs below differ by role, but that is presentation only - every endpoint
  * behind them re-checks the caller, and the instructor endpoints derive the
  * instructor from the session rather than from anything the client sends. Hiding
  * a tab is not a security boundary and is not treated as one.
@@ -20,9 +20,12 @@ import { cn } from "@/lib/utils";
 const SUPERUSER_TABS = [
   { href: "/admin", label: "Sessions" },
   { href: "/admin/new", label: "New discussion" },
+  { href: "/admin/feedback", label: "Feedback" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/learners", label: "Learners" },
   { href: "/admin/instructors", label: "Instructors" },
   { href: "/admin/messages", label: "Messages" },
+  { href: "/admin/impromptu", label: "Impromptu" },
   // Last, and superuser-only: it is the tab that changes what the public site
   // offers, which is not a thing an instructor gets to do.
   { href: "/admin/settings", label: "Settings" },
@@ -30,8 +33,13 @@ const SUPERUSER_TABS = [
 
 const INSTRUCTOR_TABS = [
   { href: "/admin/my-sessions", label: "My sessions" },
+  { href: "/admin/feedback", label: "Feedback" },
   { href: "/instructor", label: "My calendar" },
 ];
+
+//: What an instructor may open under /admin. The API re-checks either way -
+//: instructor calls are scoped to their own sessions server-side.
+const INSTRUCTOR_PREFIXES = ["/admin/my-sessions", "/admin/feedback"];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -49,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
     // An instructor landing on a superuser page goes to their own list rather
     // than seeing a 403 they can do nothing about.
-    if (isInstructor && !pathname.startsWith("/admin/my-sessions")) {
+    if (isInstructor && !INSTRUCTOR_PREFIXES.some((p) => pathname.startsWith(p))) {
       router.replace("/admin/my-sessions");
     }
   }, [loading, user, isSuperuser, isInstructor, pathname, router]);

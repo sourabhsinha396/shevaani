@@ -20,7 +20,7 @@ const LABEL: Record<PaymentProvider, string> = {
  * which method leads, and a switcher parked up in the page header made that
  * look like a display preference rather than part of paying.
  *
- * Both methods are offered in every currency — the second one is muted and
+ * Both methods are offered in every currency - the second one is muted and
  * below, never hidden. Order comes from the server (`profile.providers`,
  * recommended first) rather than from a rule here: rupees lead with Razorpay,
  * which settles domestically and is the only one of the two doing UPI, and
@@ -28,7 +28,7 @@ const LABEL: Record<PaymentProvider, string> = {
  * release.
  *
  * A method only renders unpressable when this deployment has no keys for it,
- * and it still renders — "not switched on yet" is information, where a silently
+ * and it still renders - "not switched on yet" is information, where a silently
  * missing button looks like a method we do not support at all.
  */
 export function PayMethods({
@@ -91,11 +91,11 @@ export function PayMethods({
           <Button
             // `outline`, not `ghost`. Ghost paints nothing until the pointer is
             // over it, so the alternative read as a line of text rather than a
-            // control — and a payment method nobody recognises as clickable is
+            // control - and a payment method nobody recognises as clickable is
             // the same as not offering it. The border carries the affordance;
             // the muted label is what keeps it below the brand-filled primary.
             variant="outline"
-            className="text-muted-foreground font-normal"
+            className="text-foreground font-normal border boder-brand-ink"
             disabled={disabled || busy || !option.available}
             onClick={() => onPay(option.provider)}
           >

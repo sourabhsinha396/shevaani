@@ -49,14 +49,14 @@ import {
  *
  * Separate from `/checkout` on purpose. That page sells credits and treats the
  * thing being booked as a footnote; here the session *is* the purchase, so it
- * leads — a learner should be able to check the day, the topic and who is
+ * leads - a learner should be able to check the day, the topic and who is
  * hosting before they spend anything.
  *
  * Two shapes, decided by the balance:
  *
- * * **Enough credits** — one confirm button. No money moves and no provider is
+ * * **Enough credits** - one confirm button. No money moves and no provider is
  *   involved; the credits were bought earlier.
- * * **Short** — the packs appear inline, so a first booking is one page rather
+ * * **Short** - the packs appear inline, so a first booking is one page rather
  *   than a detour through `/checkout` and back.
  *
  * A full session is a third case that costs nothing: the waitlist is free to
@@ -75,7 +75,7 @@ export default function DiscussionCheckoutPage() {
 
   const [loading, setLoading] = React.useState(true);
   const [booking, setBooking] = React.useState(false);
-  // Which provider is mid-flight, not just "something is" — two buttons share
+  // Which provider is mid-flight, not just "something is" - two buttons share
   // this and only the pressed one should spin.
   const [paying, setPaying] = React.useState<PaymentProvider | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -103,7 +103,7 @@ export default function DiscussionCheckoutPage() {
         setPacks(list);
         // Starter, not the "most popular" pack the pricing page pushes. Someone
         // who arrived here came to book *this* discussion, and the smallest
-        // pack covers it exactly — defaulting to a bigger one preselects an
+        // pack covers it exactly - defaulting to a bigger one preselects an
         // upsell they did not ask for. The list is ordered by size, so `[0]` is
         // the right fallback if the slug ever changes.
         setSelected(
@@ -112,7 +112,7 @@ export default function DiscussionCheckoutPage() {
         );
       })
       .catch((e: Error) => setError(e.message));
-    // Re-runs on a currency switch because the *provider* can change with it —
+    // Re-runs on a currency switch because the *provider* can change with it -
     // rupees lead with Razorpay, everything else with Stripe.
   }, [user, currency]);
 
@@ -120,14 +120,14 @@ export default function DiscussionCheckoutPage() {
     session?.my_booking_status === "confirmed" ||
     session?.my_booking_status === "waitlisted";
 
-  // Already in — nothing to check out. Send them where the join link lives
+  // Already in - nothing to check out. Send them where the join link lives
   // rather than showing a buy button for a seat they hold.
   React.useEffect(() => {
     if (held) router.replace(`/discussions/${id}`);
   }, [held, router, id]);
 
   const pack = packs.find((p) => p.id === selected) ?? null;
-  // What the server resolved, not what the browser guessed — it is what the
+  // What the server resolved, not what the browser guessed - it is what the
   // order will actually be opened in.
   const active = profile?.currency ?? currency;
   const price = pack ? priceFor(pack, active) : null;
@@ -141,16 +141,16 @@ export default function DiscussionCheckoutPage() {
       clearPendingBooking();
       await refresh();
       // Back to the session, which reads the booking state itself and switches
-      // to the join button — no need to tell it what just happened.
+      // to the join button - no need to tell it what just happened.
       router.push(`/discussions/${id}`);
     } catch (e) {
       const failure = e as ApiError;
       setError(
         failure.code === "insufficient_credits"
-          ? "You don't have enough left for this seat — pick a pack below and we'll bring you straight back."
+          ? "You don't have enough left for this seat - pick a pack below and we'll bring you straight back."
           : failure.message,
       );
-      // The balance may have moved under us — a promotion from another
+      // The balance may have moved under us - a promotion from another
       // waitlist, a refund. Re-read it so the page stops offering a button the
       // API just refused.
       await refresh();
@@ -186,7 +186,7 @@ export default function DiscussionCheckoutPage() {
       await openRazorpayCheckout(payload, {
         onSuccess: (result) => {
           // The signature is only available here, so it is spent here. The
-          // success page verifies again on arrival — idempotent, and the
+          // success page verifies again on arrival - idempotent, and the
           // authority is the server's own fetch of the order either way.
           void api
             .verifyPayment(checkout.payment_id, {
@@ -202,7 +202,7 @@ export default function DiscussionCheckoutPage() {
               router.push(`/checkout/success?payment=${checkout.payment_id}`);
             });
         },
-        // Closing the modal is not an error — nothing was charged, and the
+        // Closing the modal is not an error - nothing was charged, and the
         // order stays open for another attempt.
         onDismiss: () => setPaying(null),
       });
@@ -239,7 +239,7 @@ export default function DiscussionCheckoutPage() {
   if (held) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-32">
-        <Loader2 className="size-4 animate-spin" /> You already have a place — taking you back…
+        <Loader2 className="size-4 animate-spin" /> You already have a place - taking you back…
       </div>
     );
   }
@@ -270,12 +270,12 @@ export default function DiscussionCheckoutPage() {
           </h1>
           <p className="text-muted-foreground mt-2 text-pretty">
             {waitlist
-              ? "Every seat is taken. Joining costs nothing — you're charged only if a place frees up and you move in."
+              ? "Every seat is taken. Joining costs nothing - you're charged only if a place frees up and you move in."
               : `${sessionLabel(sessionsFrom(cost))} from your balance takes this seat. Cancel more than 12 hours before it starts and it comes back.`}
           </p>
         </div>
         {/* Currency lives in the order summary now, beside the buttons it
-            actually governs — see `PayMethods`. */}
+            actually governs - see `PayMethods`. */}
         <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
           <Ticket className="size-3.5" /> {sessionBalanceLabel(credits)} left
         </Badge>
@@ -335,7 +335,7 @@ export default function DiscussionCheckoutPage() {
                 <div className="border-border/60 flex items-start gap-3 border-t pt-4">
                   <BookOpen className="text-brand-ink mt-0.5 size-4 shrink-0" />
                   <p className="text-muted-foreground text-pretty">
-                    There&apos;s prep material for this one. Skim it before you join — the
+                    There&apos;s prep material for this one. Skim it before you join - the
                     discussion assumes you have.
                   </p>
                 </div>
@@ -348,7 +348,7 @@ export default function DiscussionCheckoutPage() {
           {short > 0 && (
             <div className="flex flex-col gap-3">
               <h2 className="font-sans font-medium">
-                You&apos;re {sessionLabel(shortSessions)} short — pick a pack
+                You&apos;re {sessionLabel(shortSessions)} short - pick a pack
               </h2>
               {packs.map((option) => {
                 const chosen = option.id === selected;

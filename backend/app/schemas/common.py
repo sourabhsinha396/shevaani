@@ -21,6 +21,9 @@ class UserOut(ORMModel):
     #: Null means unconfirmed. Advisory — nothing is blocked by it; the frontend
     #: uses it to offer a resend.
     email_verified_at: datetime | None = None
+    #: Your own code, for building invite links (``?r=<code>``). Only ever the
+    #: authenticated caller's — nothing serialises somebody else's through this.
+    referral_code: str | None = None
     headline: str | None = None
     bio: str | None = None
 

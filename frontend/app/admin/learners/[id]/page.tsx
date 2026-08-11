@@ -21,6 +21,7 @@ const REASON_LABEL: Record<string, string> = {
   admin_grant: "Granted by admin",
   admin_revoke: "Revoked by admin",
   signup_bonus: "Welcome credit",
+  referral_bonus: "Referral reward",
 };
 
 export default function AdminLearnerPage() {
@@ -106,7 +107,7 @@ export default function AdminLearnerPage() {
             <Coins className="size-4" /> {learner.balance} credits
           </CardTitle>
           <CardDescription>
-            The balance is the sum of the entries below — nothing is ever edited,
+            The balance is the sum of the entries below - nothing is ever edited,
             so an adjustment adds a row rather than changing one. A negative
             number claws credits back and is refused if it would go below zero.
           </CardDescription>

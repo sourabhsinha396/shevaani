@@ -239,6 +239,34 @@ def build_session_reminder(
     )
 
 
+def build_feedback_report(
+    *,
+    to: str,
+    full_name: str,
+    title: str,
+    report_md: str,
+) -> Email:
+    """The learner's GD feedback, sent on the instructor's explicit click.
+
+    The report rides in the body — markdown reads fine as plain text — because
+    the moment of "your feedback is here" should not require a login to mean
+    anything. The dashboard link is for keeping it, not for reading it.
+    """
+    return Email(
+        to=to,
+        to_name=full_name,
+        subject=f"Your feedback from {title}",
+        body=_sign_off(
+            f"Hi {full_name},\n\n"
+            f"Here's your personal feedback from *{title}*:\n\n"
+            f"{report_md}\n\n"
+            "It also lives on your dashboard, alongside feedback from your "
+            "other sessions:\n\n"
+            f"{settings.frontend_origin}/dashboard/feedback"
+        ),
+    )
+
+
 def build_session_auto_cancelled(
     *,
     to: str,

@@ -12,6 +12,7 @@ import { Field, Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { browserTimeZone, detectCountry } from "@/lib/currency";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/passwords";
+import { clearReferralCode, storedReferralCode } from "@/lib/referral";
 
 function RegisterForm() {
   const router = useRouter();
@@ -42,10 +43,15 @@ function RegisterForm() {
         // and can be null without costing anybody anything.
         timezone: browserTimeZone() || undefined,
         billing_country: detectCountry() ?? undefined,
+        // The URL wins over storage: a code on *this* page is the freshest
+        // claim there is. Storage covers the person who landed with ?r= days
+        // ago and found their way here from the nav.
+        referral_code: params.get("r") ?? storedReferralCode() ?? undefined,
       });
+      clearReferralCode();
       await refresh();
       // Someone who came here from a pack on the pricing page is trying to buy,
-      // not to browse — put them back where they were going.
+      // not to browse - put them back where they were going.
       router.push(params.get("next") ?? "/discussions");
     } catch (e) {
       setError((e as Error).message);

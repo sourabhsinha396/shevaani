@@ -12,7 +12,92 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH as MIN_LENGTH } from "@/lib/passwords";
+import { sessionBalanceLabel, sessionDeltaLabel } from "@/lib/pricing";
+import type { LedgerEntry } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
+
+const LEDGER_LABEL: Record<string, string> = {
+  purchase: "Sessions bought",
+  booking_spend: "Booked a session",
+  booking_refund: "Cancelled in time - returned",
+  session_cancelled: "Session cancelled - returned",
+  admin_grant: "Granted by Shevaani",
+  admin_revoke: "Adjusted by Shevaani",
+  signup_bonus: "Welcome bonus",
+  referral_bonus: "Friend enrolled - thank you",
+};
+
+/** The full ledger, moved here from the dashboard - the dashboard is about
+ *  sessions; what you've bought and spent is an account matter. */
+function BalanceCard() {
+  const { user, credits } = useAuth();
+  const [ledger, setLedger] = React.useState<LedgerEntry[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    api
+      .creditLedger()
+      .then(setLedger)
+      .catch((e) => setError((e as Error).message));
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Your balance</CardTitle>
+            <CardDescription>
+              Nothing is ever edited or removed, so this is the full story of
+              every session you have bought and spent.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="px-3 py-1.5 text-sm">
+              {sessionBalanceLabel(credits)} left
+            </Badge>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/checkout">Buy more</Link>
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col divide-y text-sm">
+        {error && <p className="text-destructive py-2">{error}</p>}
+        {ledger !== null && ledger.length === 0 && (
+          <p className="text-muted-foreground py-6 text-center">
+            Nothing here yet.{" "}
+            <Link href="/checkout" className="text-foreground underline underline-offset-4">
+              Buy some
+            </Link>
+            .
+          </p>
+        )}
+        {ledger?.map((entry) => (
+          <div
+            key={entry.id}
+            className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+          >
+            <div>
+              <p>{LEDGER_LABEL[entry.reason] ?? entry.reason}</p>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {formatDateTime(entry.created_at, user?.timezone)}
+                {entry.note ? ` · ${entry.note}` : ""}
+              </p>
+            </div>
+            <span
+              className={
+                entry.delta > 0 ? "text-[var(--success)]" : "text-muted-foreground"
+              }
+            >
+              {sessionDeltaLabel(entry.delta)}
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 function EmailCard() {
   const { user, refresh } = useAuth();
@@ -56,7 +141,7 @@ function EmailCard() {
               {/* Say what it actually costs. Nothing is blocked, and claiming
                   otherwise to force the click would be a lie. */}
               <p className="text-muted-foreground mt-1 text-pretty">
-                Everything still works — booking, joining, your balance. What an
+                Everything still works - booking, joining, your balance. What an
                 unconfirmed address risks is the reminders and joining links we
                 send you going nowhere.
               </p>
@@ -187,16 +272,13 @@ export default function AccountPage() {
         </p>
       </header>
 
+      <BalanceCard />
       <EmailCard />
       <PasswordCard />
 
       <Card className="bg-muted/30">
         <CardContent className="text-muted-foreground text-sm text-pretty">
-          Your session balance and its full history live on{" "}
-          <Link href="/dashboard" className="text-foreground underline underline-offset-4">
-            My sessions
-          </Link>
-          . To close the account or ask for a copy of your data, use the{" "}
+          To close the account or ask for a copy of your data, use the{" "}
           <Link href="/contact" className="text-foreground underline underline-offset-4">
             contact form
           </Link>

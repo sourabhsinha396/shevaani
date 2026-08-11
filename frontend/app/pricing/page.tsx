@@ -25,19 +25,11 @@ import { cn } from "@/lib/utils";
 const FAQ = [
   {
     q: "Do they expire?",
-    a: "No. There is no expiry date and no monthly minimum — a pack bought today is still bookable next year.",
-  },
-  {
-    q: "Group or one-to-one?",
-    a: "Either. One session from your balance books one of either, so the format is your choice to make rather than a price to weigh up. The occasional session prices itself differently, and says so before you book.",
-  },
-  {
-    q: "What if a session gets cancelled?",
-    a: "It comes straight back to your balance — including when we auto-cancel a discussion that hasn't filled two hours before it starts.",
+    a: "No. There is no expiry date and no monthly minimum - a pack bought today is still bookable next year.",
   },
   {
     q: "Can I get money back instead?",
-    a: "No — everything we return, we return to your balance. It never expires, so an unused session keeps its value until you book with it. The cancellation policy sets out exactly what comes back and when.",
+    a: "We only refund in case of a technical fault or the moderator failing to show up for that session.",
   },
 ];
 
@@ -56,7 +48,7 @@ export default function PricingPage() {
       <div className="mx-auto max-w-5xl px-4 py-20">
         <div className="mx-auto max-w-2xl text-center">
           <h1 className="text-4xl tracking-tight text-balance">
-            Sessions, not subscriptions
+            One time payments
           </h1>
           <p className="text-muted-foreground mt-4 text-pretty">
             Buy and spend them on group discussions or one-to-ones,
@@ -163,8 +155,7 @@ export default function PricingPage() {
         </div>
 
         <p className="text-muted-foreground mt-12 text-center text-sm text-pretty">
-          Prices are quoted in your local currency and charged in it — the amount
-          shown here is the amount taken. Full terms are in the{" "}
+          Full terms are in the{" "}
           <Link href="/refunds" className="underline underline-offset-4">
             cancellation and credit policy
           </Link>{" "}

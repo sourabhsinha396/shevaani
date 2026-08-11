@@ -6,7 +6,7 @@
 /* Tokens follow the shadcn contract so `npx shadcn add <component>` drops in
    without any edits.
 
-   The palette is a neutral grey ramp with exactly one saturated colour in it —
+   The palette is a neutral grey ramp with exactly one saturated colour in it -
    `--brand`. Nothing else in the system is allowed to be colourful, which is
    what makes a single lime button read as *the* action on a page. Semantic
    states (success/warning/destructive) are the only exceptions, and they are
@@ -31,7 +31,7 @@
 
   --brand: #d4f268;
   --brand-foreground: #0a0a0a;
-  /* Brand as *ink*. The lime is a fill colour — as text or an icon on white it
+  /* Brand as *ink*. The lime is a fill colour - as text or an icon on white it
      fails contrast outright, so anything drawn in brand rather than filled with
      it uses this darker olive instead. In dark mode the two collapse into one. */
   --brand-ink: #6f8c17;
@@ -120,6 +120,10 @@
      everything you actually read. Both are wired up in app/layout.tsx. */
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-playfair), ui-serif, Georgia, serif;
+  /* Playfair ships old-style figures by default: 3, 4, 5, 7 and 9 hang below
+     the baseline, so a stat like "1,780" reads as a rendering bug rather than a
+     number. Force lining figures for every `font-heading` element. */
+  --font-heading--font-feature-settings: "lnum" 1;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -127,7 +131,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   /* Scale only. Centring is left to Tailwind's `-translate-1/2`, which in v4
-     sets the standalone `translate` property — so the two never fight, and the
+     sets the standalone `translate` property - so the two never fight, and the
      rings stay centred when reduced-motion drops the animation entirely. */
   --animate-ripple: ripple 3.4s ease infinite;
   --animate-rise: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -245,11 +249,14 @@
     font-family: var(--font-heading);
     font-weight: 400;
     letter-spacing: -0.02em;
+    /* Set the family directly, so the `font-heading` utility's lining figures
+       don't reach here on their own. */
+    font-feature-settings: "lnum" 1;
   }
 }
 
 @layer utilities {
-  /* The eyebrow above a section heading. Small, wide-tracked, uppercase — it
+  /* The eyebrow above a section heading. Small, wide-tracked, uppercase - it
      labels the section without competing with the heading for size. */
   .eyebrow {
     @apply text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase;
@@ -263,5 +270,27 @@
 
   .container-page {
     @apply mx-auto w-full max-w-6xl px-4;
+  }
+
+  /* Rich-text description fields (Tiptap in the admin, rendered HTML on the
+     public page). One class covers both so the editor is an honest preview.
+     Only what the four-button toolbar can produce is styled - anything
+     fancier pasted in falls back to plain text rendering. */
+  .rich-text p + p {
+    margin-top: 0.75em;
+  }
+  .rich-text ul,
+  .rich-text ol {
+    margin: 0.75em 0;
+    padding-left: 1.4em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+  }
+  .rich-text ul {
+    list-style: disc;
+  }
+  .rich-text ol {
+    list-style: decimal;
   }
 }

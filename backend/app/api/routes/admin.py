@@ -35,6 +35,7 @@ from app.models.enums import (
 from app.models.session import Session
 from app.models.user import GoogleCredential, User
 from app.schemas.admin import (
+    AnalyticsOut,
     CancellationImpactOut,
     ContactHandledIn,
     CreditAdjustIn,
@@ -56,6 +57,7 @@ from app.schemas.session import (
     SessionAdminOut,
 )
 from app.schemas.settings import SiteConfigIn, SiteConfigOut
+from app.services import analytics as analytics_service
 from app.services import booking as booking_service
 from app.services import credits, session_admin, site_settings
 from app.services.errors import Conflict, NotFound
@@ -140,6 +142,7 @@ async def create_group_session(
         created_by=actor,
         instructor_id=payload.instructor_id,
         title=payload.title,
+        slug=payload.slug,
         topic=payload.topic,
         description=payload.description,
         prep_material_url=payload.prep_material_url,
@@ -172,6 +175,7 @@ async def update_group_session(
         db,
         session,
         title=payload.title,
+        slug=payload.slug,
         topic=payload.topic,
         description=payload.description,
         prep_material_url=payload.prep_material_url,
@@ -496,6 +500,23 @@ async def mark_contact_handled(
     message.handled_at = utc_now()
     message.handled_note = payload.note
     return Message(detail="Marked as handled.")
+
+
+# ------------------------------------------------------------- analytics
+
+
+@router.get("/analytics", response_model=AnalyticsOut)
+async def analytics(
+    db: DbSession,
+    _: Superuser,
+    days: Annotated[int, Query(ge=7, le=365)] = 30,
+) -> AnalyticsOut:
+    """The numbers screen: growth, money, bookings, referrals.
+
+    Read-only aggregates, computed fresh — see ``services.analytics`` for why
+    nothing is cached and why days are business-timezone days.
+    """
+    return await analytics_service.overview(db, days)
 
 
 # ------------------------------------------------------------ site config

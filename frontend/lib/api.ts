@@ -1,4 +1,5 @@
 import type {
+  AdminAnalytics,
   AdminInstructor,
   AdminSession,
   Availability,
@@ -12,6 +13,10 @@ import type {
   ContactMessage,
   CreditPack,
   DiscussionSession,
+  FeedbackReport,
+  FeedbackSpeaker,
+  FeedbackTranscriptDetail,
+  FeedbackTranscriptSummary,
   Instructor,
   JoinInfo,
   LearnerDetail,
@@ -19,14 +24,16 @@ import type {
   LedgerEntry,
   Payment,
   PaymentProvider,
+  ReferralSummary,
   Roster,
   SiteConfig,
   Slot,
   User,
 } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const PREFIX = `${BASE}/api/v1`;
+import { config } from "./config";
+
+const PREFIX = `${config.apiUrl}/api/v1`;
 
 /** Mirrors the backend's `{ detail, code }` error shape so callers can branch on
  *  a stable code rather than parsing prose. */
@@ -44,7 +51,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${PREFIX}${path}`, {
     ...init,
-    // Auth is an httpOnly cookie — nothing is ever kept in localStorage.
+    // Auth is an httpOnly cookie - nothing is ever kept in localStorage.
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -84,6 +91,9 @@ export const api = {
     full_name: string;
     timezone?: string;
     billing_country?: string;
+    /** The `?r=` code the visit carried, if any. Attribution only - an unknown
+     *  code is ignored server-side, never an error. */
+    referral_code?: string;
   }) =>
     request<{ user: User; access_token: string }>("/auth/register", {
       method: "POST",
@@ -107,7 +117,7 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
-  /** Signs the browser in on success — the mailbox has just been proven. */
+  /** Signs the browser in on success - the mailbox has just been proven. */
   resetPassword: (token: string, password: string) =>
     request<{ user: User; access_token: string }>("/auth/reset-password", {
       method: "POST",
@@ -184,7 +194,7 @@ export const api = {
   billingProfile: (currency?: string) =>
     request<BillingProfile>(`/billing/profile${qs({ currency })}`),
 
-  /** The price list. Public — no account needed, which is what lets `/pricing`
+  /** The price list. Public - no account needed, which is what lets `/pricing`
    *  show real numbers instead of a hand-copied duplicate. Every pack carries
    *  the full `prices` map, so `currency` only picks the convenience field. */
   creditPacks: (currency?: string) =>
@@ -200,7 +210,7 @@ export const api = {
 
   /** Asks the server to settle a payment against the provider. This is what
    *  actually grants credits, so the return page calls it rather than polling
-   *  for a webhook to land. Idempotent — calling it twice grants once.
+   *  for a webhook to land. Idempotent - calling it twice grants once.
    *
    *  The Razorpay fields come from its modal and are omitted for Stripe, which
    *  returns by redirect with nothing signed to pass on. Neither is trusted on
@@ -221,7 +231,7 @@ export const api = {
   // ---- instructors
   listInstructors: () => request<Instructor[]>("/instructors"),
 
-  /** Open one-to-one times across the whole team, a month per request — the
+  /** Open one-to-one times across the whole team, a month per request - the
    *  calendar has to know which dates are bookable before one is clicked. */
   availability: (params: { from?: string; days?: number; duration_minutes?: number } = {}) =>
     request<Availability>(`/instructors/availability${qs(params)}`),
@@ -263,6 +273,10 @@ export const api = {
 
   googleConnectUrl: () => `${PREFIX}/instructors/google/connect`,
 
+  // ---- referrals
+  /** Your own standing: code, who joined from your link, what it earned. */
+  myReferrals: () => request<ReferralSummary>("/referrals/me"),
+
   // ---- contact
   contact: (payload: {
     name: string;
@@ -288,6 +302,11 @@ export const api = {
     ),
 
   // ---- admin
+  /** Growth, money, bookings and referrals in one read. `days` scopes the
+   *  windowed numbers; the series is one point per business-timezone day. */
+  adminAnalytics: (days?: number) =>
+    request<AdminAnalytics>(`/admin/analytics${qs({ days })}`),
+
   adminListSessions: (params: { status?: string; kind?: string } = {}) =>
     request<AdminSession[]>(`/admin/sessions${qs(params)}`),
 
@@ -358,7 +377,7 @@ export const api = {
       body: JSON.stringify({ delta, note }),
     }),
 
-  /** Read fresh, not through the ISR cache the rest of the site sees — a
+  /** Read fresh, not through the ISR cache the rest of the site sees - a
    *  settings screen that is a minute behind reports your own save as having
    *  not happened. See `lib/site-config.ts` for the cached read. */
   adminSiteConfig: () => request<SiteConfig>("/admin/config"),
@@ -377,5 +396,41 @@ export const api = {
     request<{ detail: string }>(`/admin/contact-messages/${id}/handled`, {
       method: "POST",
       body: JSON.stringify({ note }),
+    }),
+
+  // ---- session feedback
+
+  myFeedback: () => request<FeedbackReport[]>("/feedback/me"),
+
+  sessionFeedback: (sessionId: string) =>
+    request<FeedbackReport>(`/feedback/sessions/${sessionId}`),
+
+  feedbackTranscripts: () =>
+    request<FeedbackTranscriptSummary[]>("/feedback/manage/transcripts"),
+
+  feedbackTranscript: (id: string) =>
+    request<FeedbackTranscriptDetail>(`/feedback/manage/transcripts/${id}`),
+
+  /** One intent per call: `{user_id}` maps, `{ignored: true}` dismisses,
+   *  `{user_id: null, ignored: false}` returns the row to "unresolved". */
+  feedbackMapSpeaker: (
+    speakerId: string,
+    payload: { user_id: string | null; ignored: boolean },
+  ) =>
+    request<FeedbackSpeaker>(`/feedback/manage/speakers/${speakerId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  /** Regenerate from the current mappings and publish. Queued on the worker -
+   *  poll `feedbackTranscript` to watch it land. */
+  feedbackFinalize: (transcriptId: string) =>
+    request<{ status: string }>(`/feedback/manage/transcripts/${transcriptId}/finalize`, {
+      method: "POST",
+    }),
+
+  feedbackEmailReport: (feedbackId: string) =>
+    request<{ status: string }>(`/feedback/manage/reports/${feedbackId}/email`, {
+      method: "POST",
     }),
 };

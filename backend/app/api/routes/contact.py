@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from app.api.deps import DbSession, OptionalUser
 from app.api.ratelimit import limiter
 from app.core.ratelimit import CONTACT
+from app.integrations import slack
 from app.models.contact import ContactMessage
 from app.schemas.common import Message
 from app.schemas.contact import ContactIn
@@ -59,5 +60,10 @@ async def submit(payload: ContactIn, db: DbSession, user: OptionalUser) -> Messa
             user_id=user.id if user else None,
             created_at=utc_now(),
         )
+    )
+    # Slack is only a nudge to check the admin queue. Do not send the visitor's
+    # email address or message body to a broadly searchable channel.
+    await slack.dispatch(
+        slack.contact_message(name=payload.name.strip(), subject=payload.subject.strip())
     )
     return Message(detail="Thanks — we'll reply to that address within two working days.")

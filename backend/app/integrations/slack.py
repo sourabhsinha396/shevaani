@@ -88,6 +88,11 @@ def signup(*, full_name: str, country: str | None) -> str:
     return f":wave: New learner: *{full_name}*{where}."
 
 
+def contact_message(*, name: str, subject: str) -> str:
+    """A support nudge without copying private contact-form contents to Slack."""
+    return f":email: New contact message from *{name}*: {subject}"
+
+
 def payment_succeeded(*, amount_minor: int, currency: str, credits: int, provider: str) -> str:
     return (
         f":moneybag: Payment received — {_money(amount_minor, currency)} "

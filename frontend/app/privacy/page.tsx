@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LegalPage } from "@/components/legal-page";
+import { company } from "@/lib/company";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -12,9 +13,9 @@ export const metadata: Metadata = pageMetadata({
 });
 
 /**
- * Describes the data the system actually holds. The specifics — join-link
+ * Describes the data the system actually holds. The specifics - join-link
  * access logs, the append-only credit ledger, Google Calendar as the only place
- * a session's video link is created — are all real, and a vaguer page would be
+ * a session's video link is created - are all real, and a vaguer page would be
  * both less useful and less true.
  */
 export default function PrivacyPage() {
@@ -33,7 +34,7 @@ export default function PrivacyPage() {
       <h2>What we collect</h2>
       <ul>
         <li>
-          <strong>Account</strong> — name, email address, password (stored only
+          <strong>Account</strong> - name, email address, password (stored only
           as an Argon2 hash, never as text), and time zone. We do not ask for
           your country: a rough one is inferred
           from your time zone for support and reporting, and your checkout
@@ -41,28 +42,28 @@ export default function PrivacyPage() {
           location lookup and no third party involved.
         </li>
         <li>
-          <strong>Bookings</strong> — which sessions you booked, when, whether
+          <strong>Bookings</strong> - which sessions you booked, when, whether
           you cancelled, and whether you attended.
         </li>
         <li>
-          <strong>Credits</strong> — a permanent, append-only record of every
+          <strong>Credits</strong> - a permanent, append-only record of every
           change to your balance. It is never edited, because a balance you
           cannot audit is a balance you cannot trust.
         </li>
         <li>
-          <strong>Payments</strong> — amount, currency, and the reference our
+          <strong>Payments</strong> - amount, currency, and the reference our
           payment provider gives us. <strong>Card numbers never reach us</strong>
           ; the card details are entered on Stripe&apos;s or Razorpay&apos;s own
           checkout.
         </li>
         <li>
-          <strong>Join access</strong> — each time a session&apos;s video link is
+          <strong>Join access</strong> - each time a session&apos;s video link is
           fetched, with the time and IP address. The link is a credential, so its
           use is logged; the same record is what tells the instructor who turned
           up.
         </li>
         <li>
-          <strong>Messages</strong> — anything you send through the{" "}
+          <strong>Messages</strong> - anything you send through the{" "}
           <Link href="/contact">contact form</Link>.
         </li>
       </ul>
@@ -74,7 +75,7 @@ export default function PrivacyPage() {
           No session recordings, transcripts, or audio. We do not record classes.
         </li>
         <li>
-          No card, UPI, or bank details — those stay with the payment provider.
+          No card, UPI, or bank details - those stay with the payment provider.
         </li>
       </ul>
 
@@ -88,17 +89,17 @@ export default function PrivacyPage() {
       <h2>Who else sees it</h2>
       <ul>
         <li>
-          <strong>Your instructor</strong> — your name, and whether you attended
+          <strong>Your instructor</strong> - your name, and whether you attended
           their session. Not your email, your balance, or your other bookings.
         </li>
         <li>
-          <strong>Google</strong> — a session is a Google Calendar event on the
+          <strong>Google</strong> - a session is a Google Calendar event on the
           instructor&apos;s own account, which is what creates the Meet link.
           Learners are deliberately <em>not</em> added as calendar guests, so your
           email address is not sent to Google.
         </li>
         <li>
-          <strong>Stripe and Razorpay</strong> — whichever handles your payment
+          <strong>Stripe and Razorpay</strong> - whichever handles your payment
           receives what it needs to take it.
         </li>
         <li>Nobody else. We do not sell or share personal data.</li>
@@ -109,7 +110,7 @@ export default function PrivacyPage() {
         <li>Account and booking history: while your account exists.</li>
         <li>
           Payment and credit records: seven years after the transaction, because
-          tax law requires it — these survive account deletion in a form tied to
+          tax law requires it - these survive account deletion in a form tied to
           the transaction rather than to a live profile.
         </li>
         <li>Join access logs: twelve months.</li>
@@ -135,8 +136,15 @@ export default function PrivacyPage() {
       <h2>Changes and contact</h2>
       <p>
         Material changes are announced by email before they take effect. Any
-        question about this policy — including a request under it — goes to the{" "}
-        <Link href="/contact">contact form</Link>.
+        question about this policy - including a request under it - goes to the{" "}
+        <Link href="/contact">contact form</Link>
+        {company.supportEmail && (
+          <>
+            {" "}or to{" "}
+            <a href={`mailto:${company.supportEmail}`}>{company.supportEmail}</a>
+          </>
+        )}
+        .
       </p>
     </LegalPage>
   );

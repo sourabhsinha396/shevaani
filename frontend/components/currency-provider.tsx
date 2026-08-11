@@ -31,8 +31,8 @@ function subscribe(listener: () => void): () => void {
 
 function getSnapshot(): Currency {
   // Lazily, and cached: `useSyncExternalStore` calls this on every render and
-  // re-detecting each time would both cost and — because it must return a
-  // stable value — risk an infinite render loop if it ever disagreed with itself.
+  // re-detecting each time would both cost and - because it must return a
+  // stable value - risk an infinite render loop if it ever disagreed with itself.
   if (current === null) current = detectCurrency();
   return current;
 }

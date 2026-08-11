@@ -32,7 +32,7 @@ from app.schemas.auth import (
     VerifyEmailIn,
 )
 from app.schemas.common import Message, UserOut
-from app.services import credits, passwords, verification
+from app.services import credits, passwords, referrals, verification
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -95,9 +95,17 @@ async def register(payload: RegisterIn, response: Response, db: DbSession) -> Au
         # `services.billing.provider_for` still honours one if support sets it.
         # Instructor and superuser are assigned out of band — never self-service.
         role=UserRole.LEARNER,
+        # Everybody gets a link of their own from day one — the referral page
+        # never has a "generate" state.
+        referral_code=await referrals.unique_code(db),
     )
     db.add(user)
     auth = await _issue(response, db, user)
+
+    # Attribution only: if the browser carried somebody's ?r= code, remember
+    # whose. The reward is granted later, at enrolment (first settled payment —
+    # see services/referrals.py), so nothing about this signup pays anyone.
+    await referrals.record_signup(db, user, payload.referral_code)
 
     # The welcome credit. Written here rather than by a trigger or a worker so
     # it lands in the same transaction as the account — an account that exists

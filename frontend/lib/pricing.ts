@@ -1,5 +1,5 @@
 /**
- * Marketing copy for the credit packs — and deliberately no prices.
+ * Marketing copy for the credit packs - and deliberately no prices.
  *
  * There used to be a hardcoded ₹ and $ list here, kept in step with
  * `backend/app/cli.py` by hand. Two lists was already one too many; five would
@@ -9,7 +9,7 @@
  *
  * What stays here is the part the backend has no business knowing: the blurb,
  * the feature list, and which pack gets the badge. Joined to the API rows on
- * `slug`, so a pack seeded without an entry here still renders — just bare.
+ * `slug`, so a pack seeded without an entry here still renders - just bare.
  */
 import type { CreditPack } from "@/lib/types";
 
@@ -30,7 +30,7 @@ export function sessionsFrom(credits: number): number {
 }
 
 /**
- * "4 sessions" — the unit every buying and booking screen speaks in.
+ * "4 sessions" - the unit every buying and booking screen speaks in.
  *
  * Credits are the ledger's unit and stay in the ledger. Nobody arrives wanting
  * credits; they want to talk to someone for an hour, and a balance quoted in a
@@ -50,8 +50,8 @@ export function sessionBalanceLabel(credits: number): string {
 /**
  * What a session costs, in the unit the buying screens speak in. `"Free"` at zero.
  *
- * Rounds *up*, unlike `sessionsFrom`. Rounding down is right for a balance — a
- * spare credit buys nothing — but a price rounded down reads as free: a session
+ * Rounds *up*, unlike `sessionsFrom`. Rounding down is right for a balance - a
+ * spare credit buys nothing - but a price rounded down reads as free: a session
  * priced at one credit would render "0 sessions" next to a Book button that then
  * charges for it. Admin can set an odd `price_credits` (the new-session form
  * still defaults to 1), so this is reachable, not theoretical.
@@ -65,7 +65,7 @@ export function sessionPriceLabel(credits: number): string {
  * A signed ledger movement, in sessions: `+4`, `-1`.
  *
  * Halves are shown as halves rather than rounded away. Every pack and every
- * session price is an even number of credits, so this should not come up — but
+ * session price is an even number of credits, so this should not come up - but
  * an admin grant of an odd number would otherwise display as a whole session
  * that is not on the balance, and a ledger that does not add up is worse than
  * one that shows a `0.5`.
@@ -84,7 +84,7 @@ export type PackCopy = {
 
 /* Counted in sessions, not credits, because that is the unit somebody is
    actually buying. Every pack's credit count is a multiple of
-   CREDITS_PER_SESSION — see the note on `_PACKS` in the backend CLI — so none
+   CREDITS_PER_SESSION - see the note on `_PACKS` in the backend CLI - so none
    of these numbers leaves a remainder a learner can never spend. */
 export const PACK_COPY: Record<string, PackCopy> = {
   starter: {
@@ -97,7 +97,7 @@ export const PACK_COPY: Record<string, PackCopy> = {
     ],
   },
   regular: {
-    blurb: "A month of weekly practice — where fluency actually starts to move.",
+    blurb: "A month of weekly practice - where fluency actually starts to move.",
     features: [
       "4 sessions",
       "Use for group discussions or 1:1",

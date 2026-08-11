@@ -58,7 +58,7 @@ export function WordRotate({
         </span>
       ))}
       {/* `initial={false}` so the first word is painted opaque rather than
-          animated in — the headline must be readable even if the animation
+          animated in - the headline must be readable even if the animation
           never runs. */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.span

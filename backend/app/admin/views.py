@@ -30,6 +30,14 @@ from app.models.availability import InstructorBlock
 from app.models.billing import CreditLedger, CreditPack, Payment, WebhookEvent
 from app.models.booking import Booking, JoinAccessLog
 from app.models.contact import ContactMessage
+from app.models.feedback import (
+    MeetAlias,
+    SessionFeedback,
+    SessionTranscript,
+    TranscriptSpeaker,
+)
+from app.models.impromptu import ImpromptuTopic
+from app.models.referral import Referral
 from app.models.session import (
     InstructorEngagement,
     OneOnOneSession,
@@ -52,6 +60,41 @@ class UserAdmin(ModelView, model=User):
     column_default_sort = ("full_name", False)
 
 
+class ReferralAdmin(ModelView, model=Referral):
+    """Who brought whom. ``credited_at`` NULL means joined but not yet enrolled;
+    set means the reward in ``reward_credits`` has been granted to the referrer.
+
+    Editing ``credited_at`` by hand does not move any credits — the grant lives
+    on the ledger. Blanking it *would* make the next settled payment of that
+    referred user pay the referrer again, so treat it as append-only in spirit.
+    """
+
+    name = "Referral"
+    name_plural = "Referrals"
+    icon = "fa-solid fa-user-plus"
+    category = "People"
+
+    column_list = [
+        Referral.referrer,
+        Referral.referred_user,
+        Referral.code_used,
+        Referral.created_at,
+        Referral.credited_at,
+        Referral.reward_credits,
+    ]
+    column_sortable_list = [Referral.created_at, Referral.credited_at]
+    column_default_sort = ("created_at", True)
+    column_details_list = [
+        Referral.id,
+        Referral.referrer,
+        Referral.referred_user,
+        Referral.code_used,
+        Referral.created_at,
+        Referral.credited_at,
+        Referral.reward_credits,
+    ]
+
+
 class SessionAdmin(ModelView, model=Session):
     name = "Group discussion"
     name_plural = "Group discussions"
@@ -66,12 +109,13 @@ class SessionAdmin(ModelView, model=Session):
         Session.max_seats,
         Session.price_credits,
     ]
-    column_searchable_list = [Session.title, Session.topic]
+    column_searchable_list = [Session.title, Session.topic, Session.slug]
     column_sortable_list = [Session.starts_at, Session.status, Session.title]
     column_default_sort = ("starts_at", True)
     column_details_list = [
         Session.id,
         Session.title,
+        Session.slug,
         Session.topic,
         Session.description,
         Session.status,
@@ -357,6 +401,30 @@ class ContactMessageAdmin(ModelView, model=ContactMessage):
     column_default_sort = ("created_at", True)
 
 
+class ImpromptuTopicAdmin(ModelView, model=ImpromptuTopic):
+    """The free tool's topic bank. This is where new verticals get added —
+    a ``track`` is just a string, so "Bank PO" exists the moment its first
+    topic row does. Both ``category`` and ``track`` are shown to visitors
+    verbatim; type them as you want them read."""
+
+    name = "Impromptu topic"
+    name_plural = "Impromptu topics"
+    icon = "fa-solid fa-microphone-lines"
+    category = "Platform"
+
+    column_list = [
+        ImpromptuTopic.text,
+        ImpromptuTopic.category,
+        ImpromptuTopic.track,
+        ImpromptuTopic.difficulty,
+        ImpromptuTopic.sort_order,
+        ImpromptuTopic.is_active,
+    ]
+    column_searchable_list = [ImpromptuTopic.text, ImpromptuTopic.category, ImpromptuTopic.track]
+    column_sortable_list = [ImpromptuTopic.sort_order, ImpromptuTopic.track, ImpromptuTopic.category]
+    column_default_sort = ("sort_order", False)
+
+
 class SiteSettingsAdmin(ModelView, model=SiteSettings):
     """The feature flags, as one row.
 
@@ -382,9 +450,90 @@ class SiteSettingsAdmin(ModelView, model=SiteSettings):
     column_list = "__all__"
 
 
+class SessionTranscriptAdmin(ModelView, model=SessionTranscript):
+    """The GD pipeline's inbox. NEEDS_REVIEW means somebody in the room didn't
+    match a roster name — fix the mapping under *Transcript speakers*; the
+    half-hourly sweep notices and generates the reports."""
+
+    name = "Transcript"
+    name_plural = "Transcripts"
+    icon = "fa-solid fa-file-lines"
+    category = "Feedback"
+
+    column_list = [
+        SessionTranscript.session,
+        SessionTranscript.status,
+        SessionTranscript.duration_minutes,
+        SessionTranscript.created_at,
+    ]
+    column_sortable_list = [SessionTranscript.created_at, SessionTranscript.status]
+    column_default_sort = ("created_at", True)
+    column_details_exclude_list = [SessionTranscript.sentences]
+
+
+class TranscriptSpeakerAdmin(ModelView, model=TranscriptSpeaker):
+    """The human half of identity resolution. A row with no user and no
+    ``ignored`` tick is the question being asked: who is this? Set the user
+    (or tick ignored for the bot / a stray guest) — nothing else to click."""
+
+    name = "Transcript speaker"
+    name_plural = "Transcript speakers"
+    icon = "fa-solid fa-user-tag"
+    category = "Feedback"
+
+    column_list = [
+        TranscriptSpeaker.speaker_label,
+        TranscriptSpeaker.user,
+        TranscriptSpeaker.ignored,
+        TranscriptSpeaker.confidence,
+        TranscriptSpeaker.resolved_via,
+        TranscriptSpeaker.transcript,
+    ]
+    column_searchable_list = [TranscriptSpeaker.speaker_label]
+    column_sortable_list = [TranscriptSpeaker.created_at, TranscriptSpeaker.confidence]
+    column_default_sort = ("created_at", True)
+
+
+class MeetAliasAdmin(ModelView, model=MeetAlias):
+    """What the resolver has learned. Delete a row if a mapping was wrong —
+    a bad alias silently mis-attributes every future transcript."""
+
+    name = "Meet alias"
+    name_plural = "Meet aliases"
+    icon = "fa-solid fa-masks-theater"
+    category = "Feedback"
+
+    column_list = [MeetAlias.display_name, MeetAlias.user, MeetAlias.last_seen_at]
+    column_searchable_list = [MeetAlias.display_name]
+    column_sortable_list = [MeetAlias.last_seen_at]
+    column_default_sort = ("last_seen_at", True)
+
+
+class SessionFeedbackAdmin(ModelView, model=SessionFeedback):
+    """Draft reports waiting for a human. Edit ``report_md`` freely; flipping
+    ``status`` to published is what makes it learner-visible — set
+    ``published_at`` too, the check constraint insists they travel together."""
+
+    name = "Session feedback"
+    name_plural = "Session feedback"
+    icon = "fa-solid fa-comment-dots"
+    category = "Feedback"
+
+    column_list = [
+        SessionFeedback.booking,
+        SessionFeedback.status,
+        SessionFeedback.generated_by,
+        SessionFeedback.created_at,
+        SessionFeedback.published_at,
+    ]
+    column_sortable_list = [SessionFeedback.created_at, SessionFeedback.status]
+    column_default_sort = ("created_at", True)
+
+
 VIEWS = [
     SiteSettingsAdmin,
     UserAdmin,
+    ReferralAdmin,
     SessionAdmin,
     OneOnOneSessionAdmin,
     BookingAdmin,
@@ -397,4 +546,9 @@ VIEWS = [
     CreditPackAdmin,
     JoinAccessLogAdmin,
     ContactMessageAdmin,
+    ImpromptuTopicAdmin,
+    SessionTranscriptAdmin,
+    TranscriptSpeakerAdmin,
+    MeetAliasAdmin,
+    SessionFeedbackAdmin,
 ]

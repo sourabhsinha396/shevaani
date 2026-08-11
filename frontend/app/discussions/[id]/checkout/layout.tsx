@@ -4,7 +4,7 @@ import type { Metadata } from "next";
  * A checkout has no business in the index.
  *
  * Without this it would inherit the session's own metadata from the layout
- * above — including its canonical, which would point search engines at
+ * above - including its canonical, which would point search engines at
  * `/discussions/[id]` while serving them a page that only makes sense to a
  * signed-in learner mid-purchase.
  */

@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 /**
  * The talk-time model, stated once so the maths on screen is auditable.
  *
- * `share` is the fraction of the clock that learners — not the person running
- * the room — are speaking for. It is higher here than in a classroom because a
+ * `share` is the fraction of the clock that learners - not the person running
+ * the room - are speaking for. It is higher here than in a classroom because a
  * instructor's job is to ask a question and then get out of the way, and it is
  * only 0.5 in a one-to-one because the other half is your partner talking,
  * which you do want.
@@ -40,7 +40,7 @@ export function TalkTime() {
   const yours = minutesEach(sessionMinutes, people, LEARNER_SHARE);
   const hoursPerYear = Math.round((yours * perWeek * WEEKS_PER_YEAR) / 60);
 
-  // The comparison row is deliberately fixed — it is the alternative you would
+  // The comparison row is deliberately fixed - it is the alternative you would
   // otherwise buy, not another thing to fiddle with.
   const alternatives = [
     {
@@ -79,7 +79,7 @@ export function TalkTime() {
           </h2>
           <p className="text-muted-foreground mt-5 text-pretty">
             Fluency is a function of hours spent talking, so it is worth knowing
-            how many you are buying. Move the sliders — the room size is the part
+            how many you are buying. Move the sliders - the room size is the part
             that matters most.
           </p>
         </Reveal>
@@ -175,7 +175,7 @@ export function TalkTime() {
               </div>
               <div>
                 <p className="eyebrow">Each session</p>
-                <p className="font-heading mt-2 text-3xl tracking-tight">
+                <p className="font-heading mt-2 text-3xl tracking-tight tabular-nums">
                   {yours.toFixed(1)}
                   <span className="text-muted-foreground ml-1.5 text-lg">
                     min

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * A mock of a live room, dressed as the video call it actually is. Everything
- * here is illustrative — the point is to show what "everyone gets airtime"
+ * here is illustrative - the point is to show what "everyone gets airtime"
  * looks like as a number, since that is the claim the product is making.
  */
 const ROOM = [
@@ -31,7 +31,7 @@ const ROOM = [
     name: "Sourabh",
     photo: "/images/homepage-session/sourabh.jpeg",
     score: '88',
-    // The only landscape shot of the four — centring it crops the face off.
+    // The only landscape shot of the four - centring it crops the face off.
     position: "object-[70%_35%]",
   },
 ];
@@ -44,17 +44,17 @@ const ROOM = [
 const TURNS = [0, 2, 1, 3, 2, 0, 3, 1];
 
 const AGENDA = [
-  { icon: FileText, label: "Prep read", value: "We never tell to grill you" },
+  { icon: FileText, label: "Topic", value: "We never tell, so as to simulate real-world" },
   { icon: CalendarClock, label: "Runs for", value: "30 minutes approx" },
   { icon: Video, label: "Joins via", value: "Google Meet" },
 ];
 
-/** The call controls along the bottom. Decoration — the real thing is Meet. */
+/** The call controls along the bottom. Decoration - the real thing is Meet. */
 const CONTROLS = [Mic, Video, Hand, MessageSquare];
 
 export function SessionPreview() {
   // Whose turn it is, as an index into TURNS. One speaker at a time, because
-  // that is what a facilitated room sounds like — people take turns rather than
+  // that is what a facilitated room sounds like - people take turns rather than
   // talking over each other.
   const [turn, setTurn] = React.useState(0);
   const speaker = TURNS[turn];
@@ -67,7 +67,7 @@ export function SessionPreview() {
 
   return (
     <section className="section bg-surface-subtle">
-      {/* The call window gets the wider column — the tiles are the argument,
+      {/* The call window gets the wider column - the tiles are the argument,
           so they get the room to be looked at. */}
       <div className="container-page grid items-center gap-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <Reveal>
@@ -76,7 +76,7 @@ export function SessionPreview() {
             4-8 learners, ~30 minutes
           </h2>
           <p className="text-muted-foreground mt-5 text-pretty">
-            An moderator gives a random topic without any prep, and you either speak or waste your turn. 
+            An moderator gives a random topic, without any prep, you either speak or waste your turn. 
           </p>
 
           <dl className="mt-8 flex flex-col gap-4">
@@ -153,7 +153,7 @@ export function SessionPreview() {
                       className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60"
                     />
 
-                    {/* Talk time, top right — the number that carries the
+                    {/* Talk time, top right - the number that carries the
                         argument, so it stays on screen the whole time. */}
                     <span className="absolute top-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white tabular-nums backdrop-blur-sm">
                       {person.score}%
@@ -196,7 +196,7 @@ export function SessionPreview() {
 
               <p className="text-muted-foreground ml-auto flex items-center gap-2 text-xs">
                 <Users className="size-3.5" />
-                4 of 8 · instructor in the room
+                4 of 8 · instructor in the session
               </p>
             </div>
           </div>

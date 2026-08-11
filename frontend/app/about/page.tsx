@@ -14,7 +14,7 @@ export const metadata: Metadata = pageMetadata({
 
 const NUMBERS = [
   { value: "6", label: "learners at most in a discussion" },
-  { value: "45", label: "minutes, and everyone speaks" },
+  { value: "30", label: "minutes, and everyone speaks" },
   { value: "1", label: "session at a time, no subscription" },
 ];
 
@@ -28,23 +28,16 @@ export default function AboutPage() {
       <div className="text-muted-foreground mt-8 flex flex-col gap-6 text-pretty">
         <p>
           Most people who want to speak better English have already done the
-          courses. They know the grammar, they have the vocabulary, and they
-          still hesitate for two seconds before every sentence in a meeting. The
-          missing part is not knowledge. It is having said the thing out loud,
-          often enough, with someone listening.
+          courses. We know the grammar, we have the vocab, and we
+          still hesitate. The
+          missing part is not knowledge. It is practice. 
         </p>
         <p>
-          So Shevaani is not a course. It is a schedule of small discussions you
-          can drop into: a topic, a handful of other learners, and an
-          instructor whose job is to keep the conversation moving and to correct
-          you where it matters. Forty-five minutes, then you go back to your day.
+          SheVaani is not a course. It is a schedule of small discussions you
+          can drop into: a topic, a handful of other learners, and learn to tame your fear.
         </p>
         <p>
-          The size is the whole design. A group of six means everyone talks. At
-          twenty, four people talk and the rest listen — which is a lecture, and
-          you can watch one of those for free. When a discussion has not reached
-          its minimum two hours before it starts, we cancel it and return the
-          session rather than run a conversation that will not work.
+          The size is the whole design. A group of 4-8 means everyone talks.
         </p>
       </div>
 
@@ -68,8 +61,8 @@ export default function AboutPage() {
           discussions list. One session.
         </li>
         <li>
-          <strong className="text-foreground">Prep arrives beforehand</strong> —
-          usually a short article or a list of questions, so nobody starts cold.
+          <strong className="text-foreground">We never tell the topic</strong> -
+          We avoid giving any hints about what will be discussed, to simulate a real conversation.
         </li>
         <li>
           <strong className="text-foreground">You join on video</strong>. The
@@ -77,17 +70,13 @@ export default function AboutPage() {
         </li>
         <li>
           <strong className="text-foreground">You talk</strong>, and the
-          instructor keeps it balanced — which mostly means making sure the
-          quietest person in the room gets the floor.
+          moderator just observes. The moderator will not fetch you the oppotunity to speak. You do it yourself, or waste your money.
         </li>
       </ol>
 
       <h2 className="mt-16 text-2xl tracking-tight">Instructors</h2>
       <p className="text-muted-foreground mt-6 text-pretty">
-        Sessions are hosted by instructors we bring on ourselves — there is no
-        open marketplace and no self-signup. Each one hosts from their own
-        calendar, which is what makes them the actual host of the video call
-        rather than another participant in it.
+        Our instructors are not teachers. They are generally people from corporate backgrounds who have been taken group discussions in Industry and in Hiring processes. 
       </p>
 
       <div className="mt-14 flex flex-wrap gap-3">

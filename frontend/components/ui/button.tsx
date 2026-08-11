@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-/* Every button is a pill. The variants differ only in fill, never in shape —
+/* Every button is a pill. The variants differ only in fill, never in shape -
    which is what lets a row of mixed actions read as one control group. */
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0",
@@ -18,7 +18,7 @@ const buttonVariants = cva(
         // The one saturated control on the page. At most one per view.
         brand:
           "bg-brand text-brand-foreground hover:opacity-90 active:translate-y-px",
-        // Transparent, not `bg-background` — on a card the page background
+        // Transparent, not `bg-background` - on a card the page background
         // would read as a hole punched through it.
         outline:
           "border-border hover:bg-muted hover:text-foreground border bg-transparent",

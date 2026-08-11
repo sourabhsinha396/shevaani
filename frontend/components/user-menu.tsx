@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   CalendarDays,
   ChevronDown,
+  Gift,
   LogOut,
   Settings,
   Shield,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-/** The given name alone — "Priya Sharma" reads as Priya. Falls back to the part
+/** The given name alone - "Priya Sharma" reads as Priya. Falls back to the part
  *  of the email before the @ so a profile saved without a name still names the
  *  person rather than showing an empty control. */
 function firstName(fullName: string, email: string): string {
@@ -36,7 +37,7 @@ function firstName(fullName: string, email: string): string {
  *
  * The header used to spell out My sessions, Account, Admin, Teaching, Calendar
  * and Sign out as six separate links, which crowded out the three that are
- * actually navigation — discussions, 1:1 and pricing. Personal destinations are
+ * actually navigation - discussions, 1:1 and pricing. Personal destinations are
  * not competing for attention with those; they are things you go looking for,
  * which is exactly what a menu is for.
  *
@@ -62,7 +63,7 @@ export function UserMenu() {
           // Outlined rather than bare text: name and chevron sitting loose in
           // the header read as two unrelated things next to each other. The
           // border draws the boundary that says they are one control, and it
-          // matches the credits pill beside it — `outline` is transparent, so
+          // matches the credits pill beside it - `outline` is transparent, so
           // it stays as quiet as the nav links while still being a *control*.
           className={cn(
             "group text-muted-foreground h-9 cursor-pointer gap-1.5 pr-2.5 text-sm font-normal",
@@ -92,7 +93,7 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* No "My sessions" here — it is a destination, so it stays in the nav
+        {/* No "My sessions" here - it is a destination, so it stays in the nav
             proper rather than being duplicated behind a menu. */}
         <DropdownMenuItem asChild>
           <Link href="/checkout">
@@ -103,6 +104,12 @@ export function UserMenu() {
             <span className="text-muted-foreground ml-auto text-xs tabular-nums">
               {sessionsFrom(credits)}
             </span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/referrals">
+            <Gift />
+            Refer a friend
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

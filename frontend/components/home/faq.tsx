@@ -10,40 +10,32 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-/** Answers match the actual booking rules in the backend — if a rule changes
+/** Answers match the actual booking rules in the backend - if a rule changes
  *  there, it has to change here too. */
 const FAQS = [
   {
     q: "Do I need a certain level to join?",
-    a: "You need enough English to hold a slow conversation. Rooms are mixed rather than sorted by level, and the instructor's job is to keep everyone in it. If you land in one that feels wrong, cancel and the session comes straight back.",
+    a: "No, The whole point is to learn from people who are better than you. You can be a beginner and still get a lot out of it.",
   },
   {
     q: "What happens if not enough people book?",
-    a: "The session cancels itself two hours before it starts and puts it back on every learner's balance automatically. You will never be the only person in a room, and you never have to ask for it back.",
+    a: "We will postpone the discussion and return your credits. You can rebook for a later date. This rarely happens.",
   },
   {
     q: "How late can I cancel?",
-    a: "Up to twelve hours before the session. It returns to your balance rather than going through a card refund, so it is instant and you can rebook the same evening.",
-  },
-  {
-    q: "What if the discussion is full?",
-    a: "You join the waitlist. If someone cancels, the next person in line is enrolled and charged automatically — you do not have to sit refreshing the page.",
-  },
-  {
-    q: "When can I book a one-to-one?",
-    a: "Between 07:00 and 19:00 IST, and each booking keeps an hour clear on either side so your instructor is never running one session straight into the next.",
+    a: "Up to twelve hours before the session. It returns to your credit balance rather than going through a card refund, so it is instant and you can rebook whenever you like.",
   },
   {
     q: "Which video tool do you use?",
-    a: "Google Meet. The link appears on your dashboard fifteen minutes before the session — no installs and no meeting IDs to type. Your instructor hosts, so join a couple of minutes early and they will let you in.",
+    a: "Google Meet. We recommend joining a couple of minutes early.",
   },
   {
     q: "Do they expire?",
     a: "No. A session you have bought is yours to spend on a group discussion or a one-to-one, whenever you get round to it.",
   },
   {
-    q: "Can I try it before paying?",
-    a: "Yes — make an account and your first group discussion is on us.",
+    q: "Can you provide me a recording of my session?",
+    a: "No, we never record nor recommend recording by anyone. We should respect the privacy of all participants and the instructor.",
   },
 ];
 
@@ -52,8 +44,8 @@ export function Faq() {
     <section className="section bg-surface-subtle">
       <div className="container-page grid gap-12 lg:grid-cols-3">
         <Reveal>
-          <p className="eyebrow mb-5">Common questions</p>
-          <h2 className="text-4xl md:text-5xl">Answers.</h2>
+          <p className="eyebrow mb-5">Frequently Asked Questions</p>
+          <h2 className="text-4xl">FAQs.</h2>
           <p className="text-muted-foreground mt-5 text-sm text-pretty">
             Still stuck? The{" "}
             <Link
@@ -62,7 +54,7 @@ export function Faq() {
             >
               discussion list
             </Link>{" "}
-            shows the real thing — topics, times and how many seats are left.
+            shows the real thing - topics, times and how many seats are left.
           </p>
         </Reveal>
 

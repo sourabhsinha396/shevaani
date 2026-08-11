@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Concentric rings breathing behind a hero. Deliberately drawn in `border`
- * colour rather than brand — it should read as texture you notice on the second
+ * colour rather than brand - it should read as texture you notice on the second
  * look, not as decoration competing with the headline. Parent needs `relative`.
  */
 export function Ripple({
@@ -129,14 +129,22 @@ export function Marquee({
 
 /**
  * A card that lights up under the cursor. The highlight is a radial gradient
- * positioned from two CSS variables the pointer handler writes — no re-render
+ * positioned from two CSS variables the pointer handler writes - no re-render
  * per mouse move, which matters when a grid of these is on screen at once.
  */
 export function SpotlightCard({
   children,
   className,
+  overlay,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & {
+  /**
+   * Edge decoration (a border beam, say). Rendered against the card itself
+   * rather than the padded content wrapper, so it tracks the card's own
+   * border and radius instead of sitting inset by the padding.
+   */
+  overlay?: React.ReactNode;
+}) {
   const ref = React.useRef<HTMLDivElement>(null);
 
   const onMouseMove = React.useCallback((event: React.MouseEvent) => {
@@ -162,6 +170,7 @@ export function SpotlightCard({
             "radial-gradient(220px circle at var(--spot-x, 50%) var(--spot-y, 50%), color-mix(in oklab, var(--brand) 22%, transparent), transparent 70%)",
         }}
       />
+      {overlay}
       <div className="relative">{children}</div>
     </div>
   );
@@ -169,7 +178,7 @@ export function SpotlightCard({
 
 /**
  * Fades and lifts its children the first time they scroll into view. Used
- * sparingly — section headings and the big set pieces, not every paragraph.
+ * sparingly - section headings and the big set pieces, not every paragraph.
  */
 export function Reveal({
   children,
@@ -255,7 +264,7 @@ export function VoiceBars({
 }
 
 /**
- * Counts up when it scrolls into view, and tweens between values afterwards —
+ * Counts up when it scrolls into view, and tweens between values afterwards -
  * so the same component works both for a static stat and for a figure a slider
  * is driving. Later runs start from whatever is on screen rather than from
  * zero, which is what stops a dragged slider looking like a slot machine.
@@ -321,7 +330,9 @@ export function NumberTicker({
   }, [value, duration, seen]);
 
   return (
-    <span ref={ref} className={className}>
+    // Tabular figures keep every frame of the count-up the same width, so the
+    // number lands in place instead of shuffling the text beside it.
+    <span ref={ref} className={cn("tabular-nums", className)}>
       {display.toLocaleString()}
     </span>
   );

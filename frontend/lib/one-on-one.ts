@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Is one-to-one bookable at all?" — asked once per page load, shared.
+ * "Is one-to-one bookable at all?" - asked once per page load, shared.
  *
  * Two places need this and they need opposite defaults. The header must not
  * delete a working page from the nav because a request failed, so it treats
@@ -26,7 +26,7 @@ function fetchSummary(): Promise<AvailabilitySummary | null> {
   return probe;
 }
 
-/** `null` while in flight, and also if the probe failed — see the note above. */
+/** `null` while in flight, and also if the probe failed - see the note above. */
 export function useOneOnOneAvailability(): AvailabilitySummary | null {
   const [summary, setSummary] = React.useState<AvailabilitySummary | null>(null);
 

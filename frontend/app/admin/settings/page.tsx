@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  * There is no per-flag markup here: the list comes from `SITE_FLAGS`, so adding
  * a switch to this screen is one entry there plus the field on `SiteConfig`.
  * That is the whole reason the flags are typed columns rather than a key/value
- * table — the label and the prose have to live somewhere anyway, and here they
+ * table - the label and the prose have to live somewhere anyway, and here they
  * sit next to a key the compiler checks.
  *
  * Each toggle saves on click rather than collecting into a Save button. One
@@ -86,7 +86,7 @@ export default function AdminSettingsPage() {
     setError(null);
     try {
       // The response is the whole config, so the screen re-syncs with whatever
-      // the server actually holds — including a flag somebody else just moved
+      // the server actually holds - including a flag somebody else just moved
       // in another tab.
       setConfig(await api.adminUpdateSiteConfig({ [key]: next }));
     } catch (e) {
@@ -107,12 +107,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <Card className="bg-muted/30">
-        <CardContent className="text-muted-foreground text-sm">
-          What each part of the product does when it is switched off. These are
-          decisions, not schedules — a switch stays where you put it until somebody
-          moves it. Saved the moment you click.
-          <br />
-          <br />
+        <CardContent className="text-muted-foreground text-sm">        
           The public site caches these for about a minute, so give it that long
           before deciding a change did not take. Anything the switch forbids is
           refused by the API immediately, cache or no cache.

@@ -35,7 +35,7 @@ function InstructorCard({
       setEditing(false);
     } catch (e) {
       // Deactivating someone who still has published sessions is refused and
-      // the message names the count — show it rather than a generic failure.
+      // the message names the count - show it rather than a generic failure.
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -162,7 +162,7 @@ export default function AdminInstructorsPage() {
     <div className="flex flex-col gap-4">
       <Card className="bg-muted/30">
         <CardContent className="text-muted-foreground text-sm">
-          Instructors are created from the backend CLI —{" "}
+          Instructors are created from the backend CLI -{" "}
           <code className="bg-muted rounded px-1.5 py-0.5 text-xs">make instructor</code>. There
           is deliberately no self-service path into the role. An instructor can only host once
           they have connected their own Google account, because the Meet link is created on their

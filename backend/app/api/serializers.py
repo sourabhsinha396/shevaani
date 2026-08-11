@@ -132,6 +132,7 @@ def build_session_out(
 ) -> SessionOut:
     return SessionOut(
         id=session.id,
+        slug=session.slug,
         # Constant since 0009: this serialises `sessions`, and that table is
         # group-only now. Kept on the payload so the frontend contract — and
         # anything already reading it — does not have to change with the schema.
@@ -172,6 +173,8 @@ def build_one_on_one_out(
     """
     return SessionOut(
         id=one_on_one.id,
+        # No slug: a one-to-one has no catalogue page for a slug to name.
+        slug=None,
         kind=SessionKind.ONE_ON_ONE,
         title=one_on_one.title,
         topic=None,

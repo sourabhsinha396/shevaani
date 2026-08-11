@@ -70,7 +70,7 @@ export function CancelSessionDialog({
                       `${impact.learners_refunded} learner(s), ignoring the usual ` +
                       `12-hour cutoff` +
                       (impact.waitlisted > 0
-                        ? `. ${impact.waitlisted} waitlisted learner(s) will be dropped — they were never charged.`
+                        ? `. ${impact.waitlisted} waitlisted learner(s) will be dropped - they were never charged.`
                         : ".")}
               </p>
             </div>
@@ -87,7 +87,7 @@ export function CancelSessionDialog({
               maxLength={500}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="The instructor is unwell — we'll run this again on Thursday."
+              placeholder="The instructor is unwell - we'll run this again on Thursday."
             />
           </Field>
 

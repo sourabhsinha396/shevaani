@@ -17,8 +17,11 @@ from app.api.routes import (
     bookings,
     config,
     contact,
+    feedback,
     instructors,
+    referrals,
     sessions,
+    tools,
     webhooks,
 )
 from app.core.config import settings
@@ -99,8 +102,11 @@ app.include_router(sessions.router, prefix=API_PREFIX)
 app.include_router(bookings.router, prefix=API_PREFIX)
 app.include_router(instructors.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
+app.include_router(referrals.router, prefix=API_PREFIX)
 app.include_router(contact.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
+app.include_router(tools.router, prefix=API_PREFIX)
+app.include_router(feedback.router, prefix=API_PREFIX)
 app.include_router(webhooks.router, prefix=API_PREFIX)
 
 # Two different things are called "admin", so be precise about which is which:
@@ -108,7 +114,6 @@ app.include_router(webhooks.router, prefix=API_PREFIX)
 #   /admin              — sqladmin. The raw data plane: tables, drill-down,
 #                         read-only where the schema says it must be.
 #   /api/v1/admin       — the JSON API behind the *frontend* admin at
-#                         localhost:3000/admin. The operational surface.
 #
 # The sqladmin one is mounted last so its sub-app can't shadow an API route. It
 # carries its own superuser session backend (app/admin/auth.py), re-checked on

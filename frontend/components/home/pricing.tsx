@@ -31,13 +31,11 @@ export function Pricing() {
       <div className="container-page">
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="eyebrow mb-5">Pricing</p>
-          <h2 className="text-4xl text-balance md:text-5xl">
-            Sessions, not subscriptions.
+          <h2 className="text-4xl text-balance">
+            One time payments, no <span className="line-through">subscriptions</span>.
           </h2>
           <p className="text-muted-foreground mt-5 text-pretty">
-            Buy a few and spend them on group discussions or one-to-ones. They
-            don&apos;t expire, and a cancelled session comes back to your
-            balance rather than sending you through a refund.
+            Buy a few and spend them on group discussions or 1:1 sessions.
           </p>
 
           {/* Guessed from your timezone. The switcher is here because the guess
@@ -71,16 +69,17 @@ export function Pricing() {
                       ? "border-brand-ink/50 md:-mt-4 md:pb-10"
                       : "border-border/60",
                   )}
+                  overlay={
+                    copy.highlight && (
+                      <BorderBeam
+                        size={120}
+                        duration={8}
+                        colorFrom="var(--brand)"
+                        colorTo="var(--brand-ink)"
+                      />
+                    )
+                  }
                 >
-                  {copy.highlight && (
-                    <BorderBeam
-                      size={120}
-                      duration={8}
-                      colorFrom="var(--brand)"
-                      colorTo="var(--brand-ink)"
-                    />
-                  )}
-
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{pack.name}</h3>
                     {copy.highlight && <Badge>Most popular</Badge>}
@@ -135,7 +134,7 @@ export function Pricing() {
         </div>
 
         <p className="text-muted-foreground mt-8 text-center text-sm">
-          Your first discussion is free ·{" "}
+          Talking to people is the only thing that improves communication ·{" "}
           <Link href="/pricing" className="text-foreground underline-offset-4 hover:underline">
             full pricing details
           </Link>

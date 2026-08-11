@@ -15,7 +15,7 @@ import type { AdminSession, Roster } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
 /**
- * The instructor's own list. Superusers can reach it too — it just shows their
+ * The instructor's own list. Superusers can reach it too - it just shows their
  * own sessions, since the endpoint scopes to the caller and never takes an
  * instructor id from the client.
  */
@@ -67,7 +67,7 @@ export default function MySessionsPage() {
         <CardContent className="text-muted-foreground flex flex-wrap items-center justify-between gap-4 text-sm">
           <p className="max-w-xl text-pretty">
             Your sessions, and who turned up. Attendance here is the
-            authoritative record — the join click is only an automatic guess at
+            authoritative record - the join click is only an automatic guess at
             it, so correct it after the session.
           </p>
           <Button asChild size="sm" variant="outline">

@@ -32,7 +32,7 @@ const BentoGrid = ({ children, className, ...props }: BentoGridProps) => (
 
 /**
  * Copy sits at the bottom, wash at the top. On hover a single beam travels the
- * border — no link, no lift, nothing that moves the text you are reading.
+ * border - no link, no lift, nothing that moves the text you are reading.
  */
 const BentoCard = ({
   name,

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * The one-click escape from a wrong guess.
  *
  * Detection is right for most visitors and wrong for travellers, expats and
- * anyone on a VPN — which is why it is a default and not a decision. Picking
+ * anyone on a VPN - which is why it is a default and not a decision. Picking
  * here writes the cookie, so the choice survives the next visit.
  */
 export function CurrencySwitcher({ className }: { className?: string }) {

@@ -5,7 +5,7 @@ import { PRIVATE_PATHS, SITE_URL, canonical } from "@/lib/seo";
 /**
  * Two rules, and the second one is the one that matters.
  *
- * Everything public is crawlable. Everything behind a sign-in is disallowed —
+ * Everything public is crawlable. Everything behind a sign-in is disallowed -
  * not because it would leak (those pages fetch their data with the caller's
  * cookie and a crawler has none), but because indexing a login wall produces
  * search results that are useless to the person who clicks them.
@@ -20,7 +20,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        // Bare paths, not `/admin/` — a Disallow is a prefix match, so this
+        // Bare paths, not `/admin/` - a Disallow is a prefix match, so this
         // covers `/admin`, `/admin/`, and everything under it. The trailing
         // slash form would leave `/admin` itself crawlable.
         disallow: PRIVATE_PATHS,

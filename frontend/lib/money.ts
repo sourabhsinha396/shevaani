@@ -2,7 +2,7 @@
  * Minor units in, formatted string out.
  *
  * The API sends paise and cents as integers and never a float, so the only
- * division in the whole money path is this one — at the point of display, after
+ * division in the whole money path is this one - at the point of display, after
  * every decision has been made.
  */
 
@@ -29,7 +29,7 @@ export function formatMinor(amountMinor: number, currency: string) {
 }
 
 /**
- * "₹205 a session" — the unit-price line under a pack.
+ * "₹205 a session" - the unit-price line under a pack.
  *
  * Divides by *sessions*, not credits. A credit is an internal unit and a price
  * per credit is not a price anyone can act on; what a buyer compares between

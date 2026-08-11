@@ -6,7 +6,7 @@ import * as React from "react";
  * Legal text is read by two audiences: a learner checking one specific thing,
  * and a payment provider's reviewer checking the page exists and says something
  * concrete. Both want a narrow measure, real headings, and a visible "last
- * updated" — so that lives here rather than being re-typed per page.
+ * updated" - so that lives here rather than being re-typed per page.
  */
 export function LegalPage({
   title,

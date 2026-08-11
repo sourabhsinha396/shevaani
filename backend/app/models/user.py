@@ -38,6 +38,11 @@ class User(Base, UUIDPrimaryKey, Timestamped):
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    #: The short identifier referral links carry (``?r=<code>``). Assigned at
+    #: creation for everyone — having one costs nothing, and a learner's first
+    #: sight of the referral page should show a link, not a "generate" button.
+    referral_code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False)
+
     #: When the learner proved they can read this address. Advisory: nothing is
     #: blocked while it is NULL — it decides whether we trust the address enough
     #: to send reminders to it, and whether the dashboard nags.

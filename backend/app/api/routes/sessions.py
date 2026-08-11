@@ -30,6 +30,20 @@ from app.services.scheduling import utc_now
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
+def _parse_uuid(value: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
+
+
+def _group_ref_clause(ref: str):
+    """WHERE clause matching a group session by UUID or slug. A slug can never
+    parse as a UUID, so the two namespaces cannot collide."""
+    parsed = _parse_uuid(ref)
+    return Session.id == parsed if parsed is not None else Session.slug == ref
+
+
 @router.get("", response_model=list[SessionOut])
 async def list_sessions(
     db: DbSession,
@@ -69,9 +83,13 @@ async def list_sessions(
 
 
 @router.get("/{session_id}", response_model=SessionOut)
-async def get_session(session_id: uuid.UUID, db: DbSession, user: OptionalUser) -> SessionOut:
+async def get_session(session_id: str, db: DbSession, user: OptionalUser) -> SessionOut:
+    """By UUID or by slug — the catalogue links by slug now, but every id ever
+    shared keeps working."""
     result = await db.execute(
-        select(Session).options(selectinload(Session.instructor)).where(Session.id == session_id)
+        select(Session)
+        .options(selectinload(Session.instructor))
+        .where(_group_ref_clause(session_id))
     )
     session = result.scalar_one_or_none()
     if session is None:
@@ -88,7 +106,7 @@ async def get_session(session_id: uuid.UUID, db: DbSession, user: OptionalUser) 
     dependencies=[Depends(limiter("book", BOOKING))],
 )
 async def book_session(
-    session_id: uuid.UUID,
+    session_id: str,
     db: DbSession,
     user: CurrentUser,
     allow_waitlist: Annotated[bool, Query()] = True,
@@ -98,8 +116,13 @@ async def book_session(
     Credits are pre-purchased, so a booking that clears the credit check is
     confirmed immediately — no payment round-trip here.
     """
+    resolved = (
+        await db.execute(select(Session.id).where(_group_ref_clause(session_id)))
+    ).scalar_one_or_none()
+    if resolved is None:
+        raise NotFound("Session not found.")
     booking = await booking_service.book_group_session(
-        db, session_id, user, allow_waitlist=allow_waitlist
+        db, resolved, user, allow_waitlist=allow_waitlist
     )
     return BookingOut.model_validate(booking)
 
@@ -113,7 +136,7 @@ async def book_session(
     dependencies=[Depends(limiter("join", JOIN, per_ip=JOIN_PER_IP))],
 )
 async def join_session(
-    session_id: uuid.UUID,
+    session_id: str,
     request: Request,
     db: DbSession,
     user: CurrentUser,
@@ -220,21 +243,24 @@ async def join_session(
 
 
 async def _load_joinable(
-    db: AsyncSession, session_id: uuid.UUID
+    db: AsyncSession, ref: str
 ) -> Session | OneOnOneSession | None:
-    """Whichever table holds this id, with its meeting loaded. Ids are UUIDs
-    from two sequences that never collide, so trying one and then the other is
-    unambiguous."""
+    """Whichever table holds this id (or slug), with its meeting loaded. Ids
+    are UUIDs from two sequences that never collide, so trying one and then
+    the other is unambiguous; a slug only ever names a group session."""
     group = await db.execute(
-        select(Session).options(selectinload(Session.meeting)).where(Session.id == session_id)
+        select(Session).options(selectinload(Session.meeting)).where(_group_ref_clause(ref))
     )
     session = group.scalar_one_or_none()
     if session is not None:
         return session
 
+    parsed = _parse_uuid(ref)
+    if parsed is None:
+        return None
     one_on_one = await db.execute(
         select(OneOnOneSession)
         .options(selectinload(OneOnOneSession.meeting))
-        .where(OneOnOneSession.id == session_id)
+        .where(OneOnOneSession.id == parsed)
     )
     return one_on_one.scalar_one_or_none()

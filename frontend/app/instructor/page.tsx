@@ -41,7 +41,7 @@ function GoogleCard() {
         <CardTitle className="text-base">Google account</CardTitle>
         <CardDescription>
           Sessions you host create a Calendar event on your account, which makes you the
-          Meet host — you can admit people from the lobby, mute, and remove.
+          Meet host - you can admit people from the lobby, mute, and remove.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center justify-between gap-4">
@@ -51,7 +51,7 @@ function GoogleCard() {
           </Badge>
         ) : (
           <Badge variant="destructive">
-            <XCircle /> Not connected — you can&apos;t host yet
+            <XCircle /> Not connected - you can&apos;t host yet
           </Badge>
         )}
 
@@ -121,7 +121,7 @@ export default function InstructorPage() {
       setForm({ starts_at: "", ends_at: "", reason: "busy", note: "" });
       await load();
     } catch (e) {
-      // The API refuses to block over live sessions and names them — surface it verbatim.
+      // The API refuses to block over live sessions and names them - surface it verbatim.
       setError((e as Error).message);
     } finally {
       setBusy(false);

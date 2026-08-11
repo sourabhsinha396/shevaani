@@ -6,19 +6,36 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { Field, Input, Select } from "@/components/ui/input";
+import { RichTextEditor } from "@/components/ui/rich-text";
 import { api } from "@/lib/api";
 import type { AdminInstructor } from "@/lib/types";
+
+/** Mirrors `services/slugs.py::slugify` so the form shows what the server will
+ *  store. Uniqueness is still the server's job - a taken slug gets `-2`. */
+function slugify(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 240)
+      .replace(/-+$/, "") || "session"
+  );
+}
 
 export default function NewSessionPage() {
   const router = useRouter();
   const [instructors, setInstructors] = React.useState<AdminInstructor[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // The slug follows the title until somebody edits it by hand.
+  const [slugTouched, setSlugTouched] = React.useState(false);
 
   const [form, setForm] = React.useState({
     instructor_id: "",
     title: "",
+    slug: "",
     topic: "",
     description: "",
     prep_material_url: "",
@@ -55,6 +72,7 @@ export default function NewSessionPage() {
     try {
       await api.adminCreateSession({
         ...form,
+        slug: form.slug || null,
         topic: form.topic || null,
         description: form.description || null,
         prep_material_url: form.prep_material_url || null,
@@ -78,7 +96,7 @@ export default function NewSessionPage() {
         <form onSubmit={submit} className="flex flex-col gap-5">
           <Field
             label="Instructor"
-            hint="Only instructors who have connected a Google account can host — the Meet link is created on their calendar."
+            hint="Only instructors who have connected a Google account can host - the Meet link is created on their calendar."
           >
             <Select
               required
@@ -89,7 +107,7 @@ export default function NewSessionPage() {
               {instructors.map((f) => (
                 <option key={f.id} value={f.id} disabled={!f.is_active}>
                   {f.full_name}
-                  {f.google_connected ? "" : " — no Google account"}
+                  {f.google_connected ? "" : " - no Google account"}
                 </option>
               ))}
             </Select>
@@ -109,9 +127,40 @@ export default function NewSessionPage() {
             <Input
               required
               maxLength={200}
-              placeholder="Tuesday Debate Club — is remote work over?"
+              placeholder="Tuesday Debate Club - is remote work over?"
               value={form.title}
-              onChange={(e) => update("title", e.target.value)}
+              onChange={(e) => {
+                const title = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  title,
+                  ...(slugTouched ? {} : { slug: slugify(title) }),
+                }));
+              }}
+            />
+          </Field>
+
+          <Field
+            label="Slug"
+            hint={`The session's URL: /discussions/${form.slug || "…"}. Auto-filled from the title; edit if you want a different one. If it's taken, the server appends -2.`}
+          >
+            <Input
+              maxLength={250}
+              placeholder="tuesday-debate-club-is-remote-work-over"
+              value={form.slug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                update("slug", e.target.value);
+              }}
+              onBlur={() => {
+                if (!form.slug.trim()) {
+                  // Cleared by hand - go back to following the title.
+                  setSlugTouched(false);
+                  update("slug", slugify(form.title));
+                } else {
+                  update("slug", slugify(form.slug));
+                }
+              }}
             />
           </Field>
 
@@ -125,11 +174,10 @@ export default function NewSessionPage() {
           </Field>
 
           <Field label="Description">
-            <Textarea
-              rows={4}
+            <RichTextEditor
               placeholder="What the group will actually talk about, and who it suits."
               value={form.description}
-              onChange={(e) => update("description", e.target.value)}
+              onChange={(html) => update("description", html)}
             />
           </Field>
 

@@ -64,7 +64,6 @@ services:
 
 # The Next.js frontend is not containerised — run it natively:
 #   cd ../frontend && npm run dev
-# It calls this API on http://localhost:8000.
 
 volumes:
   pgdata:

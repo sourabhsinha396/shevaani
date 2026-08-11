@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "Payment cancelled — Shevaani",
+  title: "Payment cancelled - Shevaani",
 };
 
 /**
  * The buyer backed out at the provider. There is a `payments` row sitting at
- * `created` and that is correct — an abandoned attempt is a real thing that
+ * `created` and that is correct - an abandoned attempt is a real thing that
  * happened, and deleting it would lose the trail if the provider later says the
  * money moved after all.
  */
@@ -25,7 +25,7 @@ export default function CheckoutCancelledPage() {
           <CardContent className="flex flex-col gap-4 text-sm">
             <p className="text-muted-foreground text-pretty">
               Nothing was charged and your balance is unchanged. If you meant to
-              buy credits, pick a pack again — it takes a minute.
+              buy credits, pick a pack again - it takes a minute.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="brand" size="sm">
@@ -41,7 +41,7 @@ export default function CheckoutCancelledPage() {
               <Link href="/contact" className="underline underline-offset-4">
                 contact form
               </Link>{" "}
-              — we would rather know.
+              - we would rather know.
             </p>
           </CardContent>
         </Card>

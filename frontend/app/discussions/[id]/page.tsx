@@ -6,9 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, BookOpen, CalendarClock, Loader2, Users, Video } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { InviteFriends } from "@/components/invite-friends";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RichTextContent } from "@/components/ui/rich-text";
 import { api } from "@/lib/api";
 import { sessionPriceLabel } from "@/lib/pricing";
 import type { DiscussionSession } from "@/lib/types";
@@ -52,7 +54,7 @@ export default function SessionDetailPage() {
   }, [load]);
 
   /** Nothing is spent here. Booking is a decision worth showing the price, the
-   *  time and the host for, so it happens on the session's own checkout — which
+   *  time and the host for, so it happens on the session's own checkout - which
    *  also sells credits inline when the balance is short. */
   function book() {
     const checkout = `/discussions/${id}/checkout`;
@@ -105,7 +107,7 @@ export default function SessionDetailPage() {
           {session.topic && <p className="text-muted-foreground mt-2">{session.topic}</p>}
 
           {session.description && (
-            <p className="mt-6 leading-relaxed text-pretty">{session.description}</p>
+            <RichTextContent value={session.description} className="mt-6" />
           )}
 
           {session.prep_material_url && (
@@ -115,7 +117,7 @@ export default function SessionDetailPage() {
                 <div>
                   <p className="font-medium">Prep material</p>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Skim this before you join — the discussion assumes you have.
+                    Skim this before you join - the discussion assumes you have.
                   </p>
                   <a
                     href={session.prep_material_url}
@@ -135,18 +137,26 @@ export default function SessionDetailPage() {
               <CardTitle className="text-base">Before you join</CardTitle>
             </CardHeader>
             <CardContent className="text-muted-foreground flex flex-col gap-2 text-sm">
-              <p>
-                Book, and the Meet link is waiting on{" "}
+              <li>
+                Book, and the Meet link is there on{" "}
                 <Link href="/dashboard" className="text-foreground underline underline-offset-4">
                   My sessions
                 </Link>{" "}
-                straight away. Open it whenever you like — if you are early you
-                will wait in a short lobby, because the room opens when the
-                instructor arrives.
-              </p>
-              <p>Headphones make a real difference to how well the group can hear each other.</p>
+                page.
+              </li>
+              <li>Please test your microphone before joining.</li>
+              <li>We recommend joining from laptop because it provides a better experience for a group meeting.</li>
+              <li>We recommend joining atleast 5 minutes early: The moderator will give you a heads-up and the session will start on time.</li>
             </CardContent>
           </Card>
+
+          {booked && (
+            <InviteFriends
+              session={session}
+              timezone={user?.timezone}
+              className="mt-6"
+            />
+          )}
         </div>
 
         <aside className="md:sticky md:top-24 md:self-start">
@@ -179,13 +189,13 @@ export default function SessionDetailPage() {
               </div>
 
               {booked ? (
-                // This page knows the session, not the booking — the link, the
+                // This page knows the session, not the booking - the link, the
                 // prep and the cancel button all live on the dashboard. Sending
                 // people there is one place to look after booking instead of two.
                 <Button asChild variant="brand" size="lg">
                   <Link href="/dashboard">
                     <Video className="size-4" />
-                    {startsSoon ? "Join now — go to my sessions" : "Go to my sessions"}
+                    {startsSoon ? "Join now - go to my sessions" : "Go to my sessions"}
                   </Link>
                 </Button>
               ) : waitlisted ? (

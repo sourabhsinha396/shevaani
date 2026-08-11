@@ -3,6 +3,7 @@ import { Geist, Playfair_Display } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
 import { CurrencyProvider } from "@/components/currency-provider";
+import { RefCapture } from "@/components/ref-capture";
 import { SiteConfigProvider } from "@/components/site-config-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -14,7 +15,7 @@ import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
-// Only the 400 weight is loaded — display headings are set at normal weight by
+// Only the 400 weight is loaded - display headings are set at normal weight by
 // design, so shipping the bolds would be dead bytes.
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
   // `default` is what the homepage and anything that forgets will use.
   title: {
     default: "Shevaani - Group Discussions and 1-1 Sessions",
-    template: "%s — Shevaani",
+    template: "%s - Shevaani",
   },
   description: DESCRIPTION,
   // Makes every relative `alternates.canonical` and OG url in child pages
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
 
 /* Async for one reason: the feature flags are read here, on the server, so the
    header's first paint already has the right links in it. The fetch is cached
-   (see `getSiteConfig`), so this does not make every page dynamic — it puts them
+   (see `getSiteConfig`), so this does not make every page dynamic - it puts them
    on a one-minute revalidation window instead. */
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const siteConfig = await getSiteConfig();
@@ -74,7 +75,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           dangerouslySetInnerHTML={{ __html: jsonLdScript(organizationJsonLd()) }}
         />
         {/* Scroll reveals start at opacity 0 and are un-hidden by an observer.
-            If the script never runs, the page would otherwise be blank — so
+            If the script never runs, the page would otherwise be blank - so
             without JS, drop the animation and show everything. */}
         <noscript>
           <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
@@ -89,6 +90,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   disagree about which currency someone is reading. Renders USD on
                   the server and swaps to the detected one after hydration. */}
               <CurrencyProvider>
+                {/* Invisible: remembers a ?r= referral code from any landing
+                    page so the register form can send it later. */}
+                <RefCapture />
                 <div className="flex min-h-screen flex-col">
                   <SiteHeader />
                   <main className="flex-1">{children}</main>

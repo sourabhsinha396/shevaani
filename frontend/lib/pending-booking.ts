@@ -8,12 +8,12 @@
  *
  * It holds no claim on anything. No seat is reserved and no time is held until a
  * booking is actually made, so this is a convenience for the buyer, never a
- * promise to them — which is why the copy around it says so out loud.
+ * promise to them - which is why the copy around it says so out loud.
  */
 
 export const PENDING_BOOKING_KEY = "shevaani_pending_booking";
 
-/** Lengths a one-to-one can be booked for, in minutes. One for now — add to
+/** Lengths a one-to-one can be booked for, in minutes. One for now - add to
  *  this list to reopen the choice on the booking page. The first is also the
  *  fallback for a link that arrives without an explicit duration. */
 export const ONE_ON_ONE_DURATIONS = [20];

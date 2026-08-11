@@ -26,7 +26,7 @@ export function SessionCard({
 }) {
   const booked = session.my_booking_status === "confirmed";
   const waitlisted = session.my_booking_status === "waitlisted";
-  // Both halves come from the shown figure, never from `seats_left` — quoting
+  // Both halves come from the shown figure, never from `seats_left` - quoting
   // the real remainder beside a padded count is how a card ends up saying
   // "5 of 6 taken" and "2 left" in the same breath. `is_full` stays real: it
   // decides waitlist vs book, which is a capacity question, not a display one.
@@ -41,7 +41,7 @@ export function SessionCard({
   ) : waitlisted ? (
     <Badge variant="warning">Waitlisted</Badge>
   ) : session.is_full ? (
-    <Badge variant="secondary">Full — waitlist open</Badge>
+    <Badge variant="secondary">Full - waitlist open</Badge>
   ) : nearlyFull ? (
     <Badge variant="warning">{seatsLeft} left</Badge>
   ) : null;
@@ -70,7 +70,7 @@ export function SessionCard({
           </span>
         </div>
 
-        {/* Seat meter — small groups are the product, so make fill obvious. */}
+        {/* Seat meter - small groups are the product, so make fill obvious. */}
         <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
           <div
             className={cn(
@@ -94,7 +94,7 @@ export function SessionCard({
         <Button asChild size="sm" variant={booked ? "outline" : "default"}>
           {/* The pseudo-element stretches the link over the whole card, so the
               card is one click target and the button stays as the affordance. */}
-          <Link href={`/discussions/${session.id}`} className="after:absolute after:inset-0">
+          <Link href={`/discussions/${session.slug ?? session.id}`} className="after:absolute after:inset-0">
             {booked ? "View details" : "See details"}
           </Link>
         </Button>
