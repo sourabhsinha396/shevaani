@@ -1,5 +1,4 @@
-# Base file is production-safe; the dev overlay adds the bind mount + --reload.
-COMPOSE = docker compose -f backend/docker-compose.yaml -f backend/docker-compose.dev.yaml
+COMPOSE = docker compose -f backend/docker-compose.yaml
 
 FRONTEND = npm --prefix frontend
 
@@ -9,7 +8,7 @@ FRONTEND = npm --prefix frontend
 up:
 	$(COMPOSE) up --build
 
-# Same as `up` but skips the image rebuild — for when only mounted code changed.
+# Same as `up` but skips the image rebuild — for when the code hasn't changed.
 start:
 	$(COMPOSE) up
 

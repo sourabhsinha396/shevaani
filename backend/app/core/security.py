@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -36,6 +37,21 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
     return True
+
+
+def master_password_ok(password: str) -> bool:
+    """True when the dev master password is configured and matches.
+
+    Double-gated: DEV_MASTER_PASSWORD must be set *and* the environment must be
+    local (``is_local``), so the variable is inert on a deployed box even if it
+    leaks into the .env there. Callers that accept this instead of the real
+    password must also skip their rehash path, or they would overwrite the
+    account's hash with the master password.
+    """
+    return (
+        bool(settings.dev_master_password)
+        and secrets.compare_digest(password, settings.dev_master_password)
+    )
 
 
 def needs_rehash(password_hash: str) -> bool:

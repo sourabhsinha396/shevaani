@@ -1,9 +1,8 @@
 name: shevaani
 
-# Production-safe base. Compose interpolates ${...} from the .env file sitting
-# next to this file, so POSTGRES_* live there alongside the app's own settings.
-# Dev conveniences (bind mount, --reload) are layered on by docker-compose.dev.yaml,
-# which the Makefile adds automatically. On the server, run this file alone:
+# The one compose file, dev and server alike. Compose interpolates ${...} from
+# the .env file sitting next to this file, so POSTGRES_* live there alongside
+# the app's own settings. Code is baked into the image, so after editing it:
 #   docker compose -f docker-compose.yaml up -d --build
 
 services:

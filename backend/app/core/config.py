@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     #: short TTL was only costing learners their session.
     session_ttl_days: int = 30
     token_encryption_key: str = ""
+    #: Development only: signs in to any account from the normal login form.
+    #: The check itself is gated on ``is_local``, so setting this in a deployed
+    #: .env does nothing. Empty disables it everywhere.
+    dev_master_password: str = ""
     #: Reset links are short-lived on purpose — they arrive by email, which is
     #: the weakest link in the chain.
     password_reset_ttl_minutes: int = 30
