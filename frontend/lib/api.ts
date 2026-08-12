@@ -109,6 +109,21 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  /** One call for both faces of the Google button - the server looks the
+   *  identity up and `created` says which it turned out to be. The signup
+   *  fields ride along on every call and are ignored for a returning user. */
+  googleAuth: (payload: {
+    /** The ID token Google Identity Services minted in the browser. */
+    credential: string;
+    timezone?: string;
+    billing_country?: string;
+    referral_code?: string;
+  }) =>
+    request<{ user: User; access_token: string; created: boolean }>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   logout: () => request<{ detail: string }>("/auth/logout", { method: "POST" }),
 
   me: () => request<User>("/auth/me"),

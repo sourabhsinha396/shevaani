@@ -16,7 +16,10 @@ class User(Base, UUIDPrimaryKey, Timestamped):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    #: NULL means the account was created with "Sign in with Google" and has
+    #: never set a password. The forgot-password flow is how one gets set —
+    #: control of the mailbox is the same proof either way.
+    password_hash: Mapped[str | None] = mapped_column(Text)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         pg_enum(UserRole, "user_role"), nullable=False, default=UserRole.LEARNER
@@ -42,6 +45,12 @@ class User(Base, UUIDPrimaryKey, Timestamped):
     #: creation for everyone — having one costs nothing, and a learner's first
     #: sight of the referral page should show a link, not a "generate" button.
     referral_code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False)
+
+    #: Google's stable account id (the ID token's ``sub``), set the first time
+    #: this person signs in with Google — whether that created the account or
+    #: attached Google to an existing one. Matched before email on later
+    #: sign-ins, because an email can change on Google's side; the sub cannot.
+    google_sub: Mapped[str | None] = mapped_column(String(64), unique=True)
 
     #: When the learner proved they can read this address. Advisory: nothing is
     #: blocked while it is NULL — it decides whether we trust the address enough

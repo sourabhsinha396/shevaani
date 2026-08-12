@@ -19,13 +19,16 @@ from app.core.security import (
     needs_rehash,
     verify_password,
 )
-from app.integrations import recaptcha, slack
+from app.integrations import google_identity, recaptcha, slack
+from app.integrations.google_identity import GoogleAuthError
 from app.models.enums import CreditReason, UserRole
 from app.models.user import User
 from app.schemas.auth import (
     AuthOut,
     ChangePasswordIn,
     ForgotPasswordIn,
+    GoogleAuthIn,
+    GoogleAuthOut,
     LoginIn,
     RegisterIn,
     ResetPasswordIn,
@@ -33,6 +36,7 @@ from app.schemas.auth import (
 )
 from app.schemas.common import Message, UserOut
 from app.services import credits, passwords, referrals, verification
+from app.services.scheduling import utc_now
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -161,6 +165,91 @@ async def login(
         user.password_hash = hash_password(payload.password)
 
     return await _issue(response, db, user)
+
+
+@router.post(
+    "/google",
+    response_model=GoogleAuthOut,
+    # The login bucket, not register's: most presses are returning users, and
+    # the expensive part (a Google account with a verified email) is already
+    # rate-limited by Google far better than we could.
+    dependencies=[Depends(limiter("google", LOGIN))],
+)
+async def google_auth(payload: GoogleAuthIn, response: Response, db: DbSession) -> GoogleAuthOut:
+    """Sign in — or up — with a Google Identity Services credential.
+
+    One endpoint for both, because the browser cannot know which it is: the
+    button looks the same to a returning learner and a brand-new one. The
+    lookup order is ``google_sub`` first (Google's stable id survives an email
+    change), then verified email (which attaches Google to a password account
+    made earlier), then a fresh account.
+    """
+    if not settings.google_client_id:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Google sign-in is not configured."
+        )
+
+    try:
+        identity = await google_identity.verify_id_token(payload.credential)
+    except GoogleAuthError:
+        # Which check failed is deliberately not echoed to an anonymous caller.
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Google sign-in failed. Please try again."
+        ) from None
+
+    result = await db.execute(select(User).where(User.google_sub == identity.sub))
+    user = result.scalar_one_or_none()
+    if user is None:
+        result = await db.execute(select(User).where(User.email == identity.email))
+        user = result.scalar_one_or_none()
+
+    if user is not None:
+        if not user.is_active:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "This account is disabled.")
+        if user.google_sub is None:
+            # First Google sign-in on an account made with a password. Safe to
+            # attach: Google vouches for the address (email_verified is checked
+            # in verify_id_token), which is the same mailbox proof a password
+            # reset runs on.
+            user.google_sub = identity.sub
+        if user.email_verified_at is None:
+            user.email_verified_at = utc_now()
+        auth = await _issue(response, db, user)
+        return GoogleAuthOut(user=auth.user, access_token=auth.access_token, created=False)
+
+    # Nobody yet — a signup, mirroring /register minus everything password:
+    # no hash (NULL means Google-only until they set one via forgot-password)
+    # and no verification email, since Google has already vouched for the
+    # address.
+    user = User(
+        email=identity.email,
+        password_hash=None,
+        full_name=identity.full_name,
+        timezone=payload.timezone,
+        billing_country=payload.billing_country,
+        role=UserRole.LEARNER,
+        referral_code=await referrals.unique_code(db),
+        google_sub=identity.sub,
+        email_verified_at=utc_now(),
+    )
+    db.add(user)
+    auth = await _issue(response, db, user)
+
+    await referrals.record_signup(db, user, payload.referral_code)
+
+    if settings.signup_bonus_credits > 0:
+        await credits.grant(
+            db,
+            user.id,
+            settings.signup_bonus_credits,
+            CreditReason.SIGNUP_BONUS,
+            note="Welcome credit",
+        )
+
+    await slack.dispatch(
+        slack.signup(full_name=user.full_name, country=user.billing_country)
+    )
+    return GoogleAuthOut(user=auth.user, access_token=auth.access_token, created=True)
 
 
 #: One response for every outcome. Whether an address is registered is not

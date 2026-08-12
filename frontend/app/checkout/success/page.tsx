@@ -8,12 +8,13 @@ import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { formatMinor } from "@/lib/money";
 import { sessionLabel, sessionsFrom } from "@/lib/pricing";
 import {
   type PendingBooking,
   checkoutHref,
+  clearPendingBooking,
   readPendingBooking,
 } from "@/lib/pending-booking";
 import type { Payment } from "@/lib/types";
@@ -45,6 +46,18 @@ function CheckoutSuccess() {
   // server render.
   const [pending, setPending] = React.useState<PendingBooking | null>(null);
   React.useEffect(() => setPending(readPendingBooking()), []);
+
+  // A pending discussion is booked here, unasked. Choosing the session was the
+  // decision; the payment was for exactly this seat, so making somebody click
+  // "finish" after paying is a step with no choice left in it. One-to-ones
+  // still confirm by hand - their slot was never held and may need re-picking.
+  const [seat, setSeat] = React.useState<
+    | { state: "booking" }
+    | { state: "booked"; waitlisted: boolean }
+    | { state: "failed"; message: string }
+    | null
+  >(null);
+  const seatAttempted = React.useRef(false);
 
   // Razorpay's checkout hands these back on the way out. Absent for Stripe,
   // which redirects with nothing signed to carry. Passed through as-is - the
@@ -96,6 +109,36 @@ function CheckoutSuccess() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentId]);
 
+  React.useEffect(() => {
+    if (payment?.status !== "paid" || pending?.kind !== "discussion") return;
+    // Once per landing: verify re-runs on reload, but a reload after a booked
+    // seat finds the pending record already cleared.
+    if (seatAttempted.current) return;
+    seatAttempted.current = true;
+
+    setSeat({ state: "booking" });
+    api
+      .bookSession(pending.sessionId)
+      .then(async (booking) => {
+        clearPendingBooking();
+        await refresh(); // the seat just spent what the payment added
+        setSeat({ state: "booked", waitlisted: booking.status === "waitlisted" });
+      })
+      .catch((e) => {
+        // "Already booked" is a success wearing a 409 - a retried verify or a
+        // second tab got there first. Everything else keeps the manual path.
+        const failure = e as ApiError;
+        if (failure.status === 409 && /already booked/i.test(failure.message)) {
+          clearPendingBooking();
+          setSeat({ state: "booked", waitlisted: false });
+          return;
+        }
+        setSeat({ state: "failed", message: failure.message });
+      });
+    // `refresh` is deliberately not a dependency, same as the poll loop above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payment?.status, pending]);
+
   if (error) {
     return (
       <div className="flex items-start gap-3 text-sm">
@@ -124,39 +167,59 @@ function CheckoutSuccess() {
   }
 
   if (payment.status === "paid") {
+    const discussion = pending?.kind === "discussion" ? pending : null;
+    const booked = seat?.state === "booked" ? seat : null;
+
     return (
       <div className="flex items-start gap-3 text-sm">
         <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--success)]" />
         <div>
           <p className="font-medium">
-            {sessionLabel(sessionsFrom(payment.credits))} added
+            {booked
+              ? booked.waitlisted
+                ? "You're on the waitlist"
+                : "Your seat is booked"
+              : `${sessionLabel(sessionsFrom(payment.credits))} added`}
           </p>
           <p className="text-muted-foreground mt-1 text-pretty">
-            {formatMinor(payment.amount_minor, payment.currency)} paid. They&apos;re
-            on your balance.
-            {pending &&
-              (pending.kind === "discussion"
-                ? " Finish booking your seat."
-                : " The time you picked still needs confirming - nothing was held while you paid.")}
+            {formatMinor(payment.amount_minor, payment.currency)} paid.
+            {booked
+              ? booked.waitlisted
+                ? " The session filled while you paid, so nothing was spent - your balance is charged only if a seat frees up and you move in."
+                : " Your seat is taken - there's nothing else to do."
+              : seat?.state === "failed"
+                ? ` It's on your balance, but the seat couldn't be taken: ${seat.message}`
+                : pending?.kind === "one_on_one"
+                  ? " It's on your balance. The time you picked still needs confirming - nothing was held while you paid."
+                  : " It's on your balance."}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {pending ? (
-              <Button asChild variant="brand" size="sm">
-                <Link href={checkoutHref(pending)}>
-                  {pending.kind === "discussion"
-                    ? "Finish taking your seat"
-                    : "Finish booking your session"}
-                </Link>
-              </Button>
-            ) : (
-              <Button asChild variant="brand" size="sm">
-                <Link href="/discussions">Book a discussion</Link>
-              </Button>
-            )}
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard">My sessions</Link>
-            </Button>
-          </div>
+          {seat?.state === "booking" || (discussion && !seat) ? (
+            <p className="text-muted-foreground mt-4 flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Taking your seat…
+            </p>
+          ) : (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {booked && discussion ? (
+                <Button asChild variant="brand" size="sm">
+                  <Link href={`/discussions/${discussion.sessionId}`}>
+                    {booked.waitlisted ? "See the session" : "See your session"}
+                  </Link>
+                </Button>
+              ) : seat?.state === "failed" && discussion ? (
+                <Button asChild variant="brand" size="sm">
+                  <Link href={checkoutHref(discussion)}>Finish taking your seat</Link>
+                </Button>
+              ) : pending?.kind === "one_on_one" ? (
+                <Button asChild variant="brand" size="sm">
+                  <Link href={checkoutHref(pending)}>Finish booking your session</Link>
+                </Button>
+              ) : (
+                <Button asChild variant="brand" size="sm">
+                  <Link href="/discussions">Book a discussion</Link>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

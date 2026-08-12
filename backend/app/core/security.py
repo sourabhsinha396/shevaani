@@ -6,7 +6,7 @@ from typing import Any
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerificationError, VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from cryptography.fernet import Fernet
 
 from app.core.config import settings
@@ -25,10 +25,15 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
-def verify_password(password: str, password_hash: str) -> bool:
+def verify_password(password: str, password_hash: str | None) -> bool:
+    # NULL is a Google-only account: no password exists, so none can be right.
+    # Handled here rather than at each caller because every place that checks a
+    # password — login, sqladmin, change-password — wants the same answer.
+    if password_hash is None:
+        return False
     try:
         _hasher.verify(password_hash, password)
-    except (VerifyMismatchError, VerificationError):
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
     return True
 

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ export default function NewSessionPage() {
   const router = useRouter();
   const [instructors, setInstructors] = React.useState<AdminInstructor[]>([]);
   const [busy, setBusy] = React.useState(false);
+  const [quickBusy, setQuickBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   // The slug follows the title until somebody edits it by hand.
   const [slugTouched, setSlugTouched] = React.useState(false);
@@ -65,6 +66,48 @@ export default function NewSessionPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  /** One click, one bookable session five minutes out. For rehearsing the
+   *  learner flow end to end - booking, the Meet link, joining - without
+   *  filling the form. Published immediately, so it needs a hostable
+   *  instructor: the selected one if they can host, else the first who can. */
+  async function createQuickTest() {
+    const host =
+      (selected?.google_connected && selected.is_active ? selected : null) ??
+      instructors.find((f) => f.google_connected && f.is_active);
+    if (!host) {
+      setError(
+        "No active instructor has a Google account connected, so a published test session can't get its Meet link.",
+      );
+      return;
+    }
+
+    setQuickBusy(true);
+    setError(null);
+    try {
+      const created = await api.adminCreateSession({
+        instructor_id: host.id,
+        title: "Quick test discussion",
+        // The server derives the slug from the title and appends -2, -3… on
+        // repeat clicks, so every test gets its own URL.
+        slug: null,
+        topic: "Test - ignore",
+        description: null,
+        prep_material_url: null,
+        starts_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+        duration_minutes: 15, // the shortest the API allows
+        min_seats: 1, // never auto-cancels for want of bookings
+        max_seats: 6,
+        price_credits: 1,
+        publish: true,
+      });
+      // Straight to the session's admin page, where the Meet link status lives.
+      router.push(`/admin/sessions/${created.id}`);
+    } catch (e) {
+      setError((e as Error).message);
+      setQuickBusy(false);
+    }
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -90,7 +133,27 @@ export default function NewSessionPage() {
   return (
     <Card className="max-w-3xl">
       <CardHeader>
-        <CardTitle>New group discussion</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle>New group discussion</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={quickBusy || instructors.length === 0}
+            onClick={() => void createQuickTest()}
+          >
+            {quickBusy ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Zap className="size-4" />
+            )}
+            Quick test in 5 min
+          </Button>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          The quick test publishes a 15-minute, 1-credit session starting in 5
+          minutes - no form needed.
+        </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="flex flex-col gap-5">

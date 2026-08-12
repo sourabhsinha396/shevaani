@@ -131,6 +131,14 @@ async def reset_password(db: AsyncSession, raw_token: str, new_password: str) ->
 async def change_password(
     db: AsyncSession, user: User, current_password: str, new_password: str
 ) -> User:
+    if user.password_hash is None:
+        # Google-created account: there is no current password to prove. The
+        # forgot-password flow is the way to set a first one — same mailbox
+        # proof, and it works signed out too.
+        raise IncorrectPassword(
+            "This account signs in with Google and has no password yet. "
+            "Use “Forgot your password?” on the sign-in page to set one."
+        )
     if not verify_password(current_password, user.password_hash):
         raise IncorrectPassword("That is not your current password.")
 

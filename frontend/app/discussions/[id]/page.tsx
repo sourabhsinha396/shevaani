@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RichTextContent } from "@/components/ui/rich-text";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { sessionPriceLabel } from "@/lib/pricing";
 import type { DiscussionSession } from "@/lib/types";
 import {
@@ -24,10 +24,11 @@ import {
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, credits, refresh } = useAuth();
 
   const [session, setSession] = React.useState<DiscussionSession | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [booking, setBooking] = React.useState(false);
   const [message, setMessage] = React.useState<{ kind: "error" | "info"; text: string } | null>(
     null,
   );
@@ -53,12 +54,51 @@ export default function SessionDetailPage() {
     void load();
   }, [load]);
 
-  /** Nothing is spent here. Booking is a decision worth showing the price, the
-   *  time and the host for, so it happens on the session's own checkout - which
-   *  also sells credits inline when the balance is short. */
-  function book() {
+  /** The price is on the button, so the click *is* the confirmation: a balance
+   *  that covers the seat books it right here. The checkout page remains for
+   *  the two cases with a real decision left - signing in, or picking a pack
+   *  when the balance is short. */
+  async function book() {
     const checkout = `/discussions/${id}/checkout`;
-    router.push(user ? checkout : `/login?next=${encodeURIComponent(checkout)}`);
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(checkout)}`);
+      return;
+    }
+    if (!session) return;
+
+    // A full session costs nothing to queue for - credits are taken on
+    // promotion - so a short balance never blocks the waitlist.
+    const cost = session.is_full ? 0 : session.price_credits;
+    if (credits < cost) {
+      router.push(checkout);
+      return;
+    }
+
+    setBooking(true);
+    setMessage(null);
+    try {
+      const booked = await api.bookSession(id);
+      await refresh(); // the header's balance just changed
+      await load(); // flips this page to its booked state
+      if (booked.status === "waitlisted") {
+        setMessage({
+          kind: "info",
+          text: "You're in the queue - we'll email you if a seat frees up.",
+        });
+      }
+    } catch (e) {
+      const failure = e as ApiError;
+      // The balance the page trusted was stale - the checkout sells the
+      // missing pack inline.
+      if (failure.code === "insufficient_credits") {
+        router.push(checkout);
+        return;
+      }
+      setMessage({ kind: "error", text: failure.message });
+      await load(); // seats or booking state moved under us; show the truth
+    } finally {
+      setBooking(false);
+    }
   }
 
   if (loading) {
@@ -203,7 +243,12 @@ export default function SessionDetailPage() {
                   <Link href="/dashboard">See your place in the queue</Link>
                 </Button>
               ) : (
-                <Button onClick={book} disabled={session.status !== "published"} size="lg">
+                <Button
+                  onClick={() => void book()}
+                  disabled={session.status !== "published" || booking}
+                  size="lg"
+                >
+                  {booking && <Loader2 className="size-4 animate-spin" />}
                   {session.is_full
                     ? "Join the waitlist"
                     : `Book · ${sessionPriceLabel(session.price_credits)}`}

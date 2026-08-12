@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { GoogleSignIn, googleSignInEnabled } from "@/components/google-sign-in";
 import { Recaptcha, recaptchaEnabled, type RecaptchaHandle } from "@/components/recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,27 @@ function RegisterForm() {
     }
   }
 
+  async function googleSignUp(credential: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.googleAuth({
+        credential,
+        // The same browser-detected context a password signup sends; the
+        // server ignores it when the account already exists.
+        timezone: browserTimeZone() || undefined,
+        billing_country: detectCountry() ?? undefined,
+        referral_code: params.get("r") ?? storedReferralCode() ?? undefined,
+      });
+      clearReferralCode();
+      await refresh();
+      router.push(params.get("next") ?? "/discussions");
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="bg-surface-subtle min-h-full">
       <div className="mx-auto flex max-w-md flex-col px-4 py-20">
@@ -107,6 +129,17 @@ function RegisterForm() {
                 {busy && <Loader2 className="size-4 animate-spin" />}
                 Create account
               </Button>
+
+              {googleSignInEnabled && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className="bg-border h-px flex-1" />
+                    <span className="text-muted-foreground text-xs">or</span>
+                    <span className="bg-border h-px flex-1" />
+                  </div>
+                  <GoogleSignIn onCredential={googleSignUp} />
+                </>
+              )}
             </form>
 
             <p className="text-muted-foreground mt-6 text-center text-sm">

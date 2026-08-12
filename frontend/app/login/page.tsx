@@ -6,15 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { GoogleSignIn, googleSignInEnabled } from "@/components/google-sign-in";
 import { Recaptcha, recaptchaEnabled, type RecaptchaHandle } from "@/components/recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const { signIn } = useAuth();
+  const { signIn, refresh } = useAuth();
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -36,6 +38,19 @@ function LoginForm() {
       // retry needs a fresh tick, so clear the widget with the error.
       captchaRef.current?.reset();
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function googleSignIn(credential: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.googleAuth({ credential });
+      await refresh();
+      router.push(params.get("next") ?? "/dashboard");
+    } catch (e) {
+      setError((e as Error).message);
       setBusy(false);
     }
   }
@@ -81,6 +96,17 @@ function LoginForm() {
         {busy && <Loader2 className="size-4 animate-spin" />}
         Sign in
       </Button>
+
+      {googleSignInEnabled && (
+        <>
+          <div className="flex items-center gap-3">
+            <span className="bg-border h-px flex-1" />
+            <span className="text-muted-foreground text-xs">or</span>
+            <span className="bg-border h-px flex-1" />
+          </div>
+          <GoogleSignIn onCredential={googleSignIn} />
+        </>
+      )}
     </form>
   );
 }
@@ -91,7 +117,7 @@ export default function LoginPage() {
       <div className="mx-auto flex max-w-md flex-col px-4 py-20">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
+            <CardTitle className="text-2xl">Login</CardTitle>
             <CardDescription>Sign in to book and join your sessions.</CardDescription>
           </CardHeader>
           <CardContent>

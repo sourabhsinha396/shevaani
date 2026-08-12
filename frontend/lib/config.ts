@@ -22,4 +22,9 @@ export const config = {
    *  and the auth forms submit without a token - the backend skips the check
    *  too when its RECAPTCHA_SECRET_KEY is unset. Set both or neither. */
   recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "",
+  /** OAuth client id for "Sign in with Google" - the same client the backend
+   *  holds as GOOGLE_CLIENT_ID, and the pair go together: empty here hides the
+   *  button, empty there makes the endpoint answer 503. The site origin must
+   *  be listed under the client's "Authorized JavaScript origins". */
+  googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
 };
