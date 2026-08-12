@@ -69,13 +69,14 @@ class WorkerSettings:
         # auto_cancel_underfilled_sessions is deliberately NOT scheduled:
         # under-filled sessions are cancelled manually for now. It stays in
         # `functions` above so it can still be enqueued by hand.
+        # dispatch_notetakers is deliberately NOT scheduled either: the admin
+        # session page has an "Invite notetaker" button that sends the bot on
+        # demand, which suits a volume where someone is in the room anyway.
+        # Likewise retry_pending_meetings — the "Retry Meet" button covers it,
+        # at the cost of a failed Meet waiting for a human to notice the badge.
+        # Both stay in `functions` so they can be enqueued by hand.
         cron(sweep_expired_holds, minute={5, 35}),
-        cron(retry_pending_meetings, minute={10, 40}),
         cron(mark_sessions_completed, minute={20, 50}),
-        # Every two minutes: `addToLiveMeeting` only works while the meeting
-        # is live, so the bot must go in shortly after starts_at. The dispatch
-        # window (15 min) tolerates a few missed ticks.
-        cron(dispatch_notetakers, minute=set(range(0, 60, 2))),
         # The admin-review loop: sqladmin edits can't enqueue jobs, this can.
         cron(sweep_review_transcripts, minute={8, 38}),
         # Every ten minutes, against a twenty-minute lateness tolerance, so a
