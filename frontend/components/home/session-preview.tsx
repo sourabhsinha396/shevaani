@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 const ROOM = [
   { name: "Shalini", photo: "/images/homepage-session/shalini.png", score: '91' },
   { name: "Kundan", photo: "/images/homepage-session/kundan.png", score: '59' },
-  { name: "Divyanshu", photo: "/images/homepage-session/harsh.png", score: '63' },
+  { name: "Divyanshu", photo: "/images/homepage-session/divyanshu.png", score: '63' },
   {
     name: "Sourabh",
     photo: "/images/homepage-session/sourabh.jpeg",
