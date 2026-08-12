@@ -34,6 +34,31 @@ export const SITE_URL = config.siteUrl;
 export const SITE_NAME = config.appName;
 
 /**
+ * The card image every share falls back to.
+ *
+ * A relative path on purpose: `metadataBase` in the root layout resolves it to
+ * an absolute URL, which is what crawlers require, and keeps the one hardcoded
+ * origin in this file rather than spread across every page.
+ *
+ * It has to be repeated wherever `openGraph` is set, not just at the root,
+ * because Next merges metadata *shallowly* - a segment that defines `openGraph`
+ * replaces the parent's whole object rather than filling in around it. That is
+ * why `pageMetadata` below spreads it in too; drop it there and every page but
+ * the homepage shares without an image.
+ *
+ * 1280x720 rather than the 1200x630 the OG spec suggests. Both are wide enough
+ * to render as a large card everywhere that matters; 16:9 gets a few pixels
+ * cropped top and bottom on X's `summary_large_image`, which is a better trade
+ * than re-cutting the artwork.
+ */
+export const OG_IMAGE = {
+  url: "/images/seo/shevaani-ogimage.jpg",
+  width: 1280,
+  height: 720,
+  alt: "Shevaani - small-group English discussions with real instructors",
+} as const;
+
+/**
  * Trailing slashes: **no**, matching Next's default.
  *
  * Worth stating rather than leaving to a default, because it has to be decided
@@ -83,11 +108,13 @@ export function pageMetadata({ title, description, path, noindex }: PageMeta): M
       siteName: SITE_NAME,
       type: "website",
       locale: "en_IN",
+      images: [OG_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [OG_IMAGE],
     },
   };
 }

@@ -42,9 +42,13 @@ export default function NewSessionPage() {
     prep_material_url: "",
     starts_at: "",
     duration_minutes: 45,
-    min_seats: 3,
-    max_seats: 6,
-    price_credits: 1,
+    min_seats: 2,
+    max_seats: 12,
+    // Matches SESSION_PRICE_CREDITS in the backend settings. The field stays
+    // editable for a one-off, but the default has to agree with the setting:
+    // a form that quietly halved the price let a fresh signup's welcome credit
+    // cover a whole session.
+    price_credits: 2,
     publish: true,
   });
 

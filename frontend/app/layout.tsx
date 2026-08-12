@@ -9,7 +9,7 @@ import { SiteConfigProvider } from "@/components/site-config-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeProvider } from "@/components/theme-provider";
-import { SITE_NAME, SITE_URL, jsonLdScript, organizationJsonLd } from "@/lib/seo";
+import { OG_IMAGE, SITE_NAME, SITE_URL, jsonLdScript, organizationJsonLd } from "@/lib/seo";
 import { getSiteConfig } from "@/lib/site-config";
 
 import "./globals.css";
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   // Every page below sets its own `title`; this template wraps it. The
   // `default` is what the homepage and anything that forgets will use.
   title: {
-    default: "Shevaani - Group Discussions and 1-1 Sessions",
+    default: "Group Discussions and 1-1 Communication Sessions",
     template: "%s - Shevaani",
   },
   description: DESCRIPTION,
@@ -47,11 +47,13 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: "Shevaani - Group Discussions and 1-1 Sessions",
     description: DESCRIPTION,
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: "Shevaani - Group Discussions and 1-1 Sessions",
     description: DESCRIPTION,
+    images: [OG_IMAGE],
   },
 };
 

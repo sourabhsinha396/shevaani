@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     #: a session: it is a discount on the first booking, not a free one, so the
     #: account starts with something on it without giving the service away to
     #: anyone who can create an email address. Set to 0 to turn it off.
-    signup_bonus_credits: int = 1
+    signup_bonus_credits: int = 2
     booking_hold_minutes: int = 10
     group_autocancel_hours_before: int = 2
     #: Cancel more than this many hours before the start for a full credit refund.
