@@ -78,7 +78,7 @@ export function SiteHeader() {
             brand colour appears in the chrome, so the header stays quiet. */}
         <Link href="/" className="flex items-center gap-2.5">
           <BrandMark className="text-brand-ink size-7" />
-          <span className="font-heading text-xl tracking-tight">SheVaani</span>
+          <span className="font-heading text-xl tracking-tight">Shevaani</span>
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">

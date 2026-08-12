@@ -64,7 +64,9 @@ export function Hero() {
           </h1>
 
           <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg text-pretty">
-            Live communication is the only way to get fluent. 
+            Shevaani is a live English speaking practice platform: join small
+            group discussions or one-on-one sessions with real instructors,
+            over Google Meet, and get a feedback report after every session.
           </p>
 
           <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">

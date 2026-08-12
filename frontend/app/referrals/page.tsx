@@ -21,7 +21,7 @@ function inviteUrl(code: string): string {
 }
 
 function inviteMessage(code: string): string {
-  return `I've been practising English on SheVaani - small group discussions, real instructors. Join me: ${inviteUrl(code)}`;
+  return `I've been practising English on Shevaani - small group discussions, real instructors. Join me: ${inviteUrl(code)}`;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {

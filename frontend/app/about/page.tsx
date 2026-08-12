@@ -33,7 +33,7 @@ export default function AboutPage() {
           missing part is not knowledge. It is practice. 
         </p>
         <p>
-          SheVaani is not a course. It is a schedule of small discussions you
+          Shevaani is not a course. It is a schedule of small discussions you
           can drop into: a topic, a handful of other learners, and learn to tame your fear.
         </p>
         <p>
