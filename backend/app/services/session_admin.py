@@ -25,9 +25,9 @@ from app.models.session import Session, SessionMeeting
 from app.models.user import User
 from app.services import booking as booking_service
 from app.services import scheduling
-from app.services.slugs import slugify, unique_session_slug
 from app.services.errors import Conflict, DomainError, NotFound, PermissionDenied, SchedulingError
 from app.services.scheduling import utc_now
+from app.services.slugs import slugify, unique_session_slug
 
 
 async def _load_instructor(db: AsyncSession, instructor_id: uuid.UUID) -> User:
@@ -234,18 +234,23 @@ async def publish_session(db: AsyncSession, session: Session) -> Session:
     return session
 
 
-async def delete_group_session(db: AsyncSession, session: Session) -> None:
+async def delete_group_session(
+    db: AsyncSession, session: Session, *, force: bool = False
+) -> None:
     """Hard-delete a session row and everything hanging off it.
 
     For the sessions this is meant for — drafts, test rows, cancelled sessions —
     the cascades take the meeting, cancelled bookings, transcript and reminders
     with it, and the engagement trigger frees the instructor's hour.
 
-    Refuses while any booking is not CANCELLED. Live seats and waitlist spots
-    are learners still expecting something, and deleting the row would eat their
-    credits with no refund; attended/no-show bookings are history that the
-    learner's record and the ledger lean on. sqladmin remains the escape hatch
-    for deleting history on purpose.
+    Refuses only while an *upcoming* booking is not CANCELLED: those are
+    learners still expecting something, and deleting the row would eat their
+    credits with no refund. ``force`` collapses the cancel-then-delete dance
+    into one step — it cancels those bookings first, refunding and emailing the
+    learners, so nobody's credits are ever eaten silently. A session that
+    already ran deletes freely either way — its attendance rows and transcript
+    go with it (the admin UI warns first), while the credit ledger survives
+    because ``booking_id`` is ON DELETE SET NULL.
     """
     result = await db.execute(
         select(sa_func.count(Booking.id)).where(
@@ -254,15 +259,14 @@ async def delete_group_session(db: AsyncSession, session: Session) -> None:
         )
     )
     live = result.scalar_one()
-    if live:
-        if session.starts_at < utc_now():
+    if live and session.starts_at >= utc_now():
+        if not force:
             raise Conflict(
-                f"This session already ran and {live} booking(s) on it are attendance "
-                f"history. Deleting that is a database-admin job, not a button."
+                f"{live} learner(s) hold a seat or waitlist spot. Cancel the session "
+                f"first — that refunds them — then delete it."
             )
-        raise Conflict(
-            f"{live} learner(s) hold a seat or waitlist spot. Cancel the session "
-            f"first — that refunds them — then delete it."
+        await booking_service.cancel_session(
+            db, session, reason="The session was taken off the schedule."
         )
 
     await db.delete(session)

@@ -128,6 +128,11 @@ export default function AdminSessionPage() {
   }
 
   const cancelled = session.status === "cancelled";
+  const alreadyRan = new Date(session.starts_at).getTime() < Date.now();
+  const liveLearners = session.seats_taken + session.waitlist_count;
+  // Deleting an upcoming session out from under booked learners needs the
+  // backend's force path: cancel + refund + email, then delete, in one step.
+  const needsForce = !alreadyRan && liveLearners > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -241,8 +246,12 @@ export default function AdminSessionPage() {
               <p className="font-medium">Delete “{session.title}” for good?</p>
               <p className="text-muted-foreground mt-1 text-pretty">
                 This removes the session, its Meet link and its calendar event
-                permanently — there is no undo. If learners hold seats it will be
-                refused: cancel the session first so they are refunded.
+                permanently — there is no undo.{" "}
+                {alreadyRan && session.seats_taken > 0
+                  ? `It already ran: ${session.seats_taken} attendance record(s), the transcript and any feedback are erased with it. Credit history is kept.`
+                  : needsForce
+                    ? `${liveLearners} learner(s) hold a seat or waitlist spot: their bookings are cancelled, their credits refunded, and they are emailed — then the session is deleted.`
+                    : "Nobody holds a seat, so nothing needs refunding."}
               </p>
             </div>
             <div className="flex gap-2">
@@ -254,7 +263,7 @@ export default function AdminSessionPage() {
                   setBusy(true);
                   setError(null);
                   try {
-                    await api.adminDeleteSession(session.id);
+                    await api.adminDeleteSession(session.id, needsForce);
                     router.push("/admin");
                   } catch (e) {
                     setError((e as Error).message);
@@ -263,7 +272,7 @@ export default function AdminSessionPage() {
                 }}
               >
                 {busy && <Loader2 className="size-4 animate-spin" />}
-                Delete permanently
+                {needsForce ? "Refund learners & delete" : "Delete permanently"}
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => setDeleting(false)}>
                 Keep it

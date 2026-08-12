@@ -69,7 +69,9 @@ _SCHEMA = {
                     "user_id": {"type": "string"},
                     "summary": {
                         "type": "string",
-                        "description": "2-3 sentences on how this person did overall.",
+                        "description": "2-4 sentences of candid assessment. One clause "
+                        "most held them back this session and what closing it would "
+                        "change. A critique, not a compliment.",
                     },
                     "strengths": {"type": "array", "items": {"type": "string"}},
                     "areas_to_improve": {"type": "array", "items": {"type": "string"}},
@@ -144,6 +146,15 @@ the transcript; when you comment on language, quote the learner's exact words. J
 fluency and structure, not accent. Do not penalise informal but natural English. Do not \
 invent things that are not in the transcript, and never attribute one speaker's words to \
 another. Address each learner directly as "you".
+
+The opening "summary" is the one section a learner is guaranteed to read, so spend it \
+on what they most need to hear, not on reassurance. Open with a brief, honest nod to \
+their strongest moment, then name the single biggest thing that held them back — with \
+a concrete moment from the transcript — and say plainly what doing it differently would \
+have changed. Do not soften it into vagueness ("could be more confident"); point at the \
+behaviour ("you raised the strongest data point of the discussion and then let it drop \
+the moment someone pushed back"). Critical is not harsh: no sarcasm, no verdicts about \
+the person, only about what they did in this session.
 
 Feedback exists to improve the learner, not to prove you listened. Flag a language note \
 as "major" only when fixing it would genuinely change how the learner comes across: a \

@@ -346,8 +346,11 @@ export const api = {
   adminPublish: (id: string) =>
     request<AdminSession>(`/admin/sessions/${id}/publish`, { method: "POST" }),
 
-  adminDeleteSession: (id: string) =>
-    request<{ detail: string }>(`/admin/sessions/${id}`, { method: "DELETE" }),
+  /** `force` cancels, refunds and emails any live bookings before deleting. */
+  adminDeleteSession: (id: string, force = false) =>
+    request<{ detail: string }>(`/admin/sessions/${id}${force ? "?force=true" : ""}`, {
+      method: "DELETE",
+    }),
 
   adminCancel: (id: string, reason: string) =>
     request<AdminSession>(`/admin/sessions/${id}/cancel`, {

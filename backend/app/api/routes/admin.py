@@ -230,18 +230,21 @@ async def cancel_session(
 
 
 @router.delete("/sessions/{session_id}", response_model=Message)
-async def delete_session(session_id: uuid.UUID, db: DbSession, _: Superuser) -> Message:
+async def delete_session(
+    session_id: uuid.UUID, db: DbSession, _: Superuser, force: bool = False
+) -> Message:
     """Hard-delete a session — for drafts, test rows and cancelled sessions.
 
-    Refused while any booking is live or is attendance history; cancel first for
-    the former, sqladmin for the latter. The Calendar event's ids are captured
-    before the row goes, because the cleanup job can no longer look them up.
+    Refused while an upcoming booking is live, unless ``force`` is set — then
+    those bookings are cancelled, refunded and emailed first, in the same
+    transaction. The Calendar event's ids are captured before the row goes,
+    because the cleanup job can no longer look them up.
     """
     session = await _load(db, session_id)
     instructor_id = session.instructor_id
     event_id = session.meeting.calendar_event_id if session.meeting else None
 
-    await session_admin.delete_group_session(db, session)
+    await session_admin.delete_group_session(db, session, force=force)
     await db.commit()
 
     if event_id:
