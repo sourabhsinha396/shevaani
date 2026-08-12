@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Playfair_Display } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
+import { CrispChat } from "@/components/crisp-chat";
 import { CurrencyProvider } from "@/components/currency-provider";
 import { RefCapture } from "@/components/ref-capture";
 import { SiteConfigProvider } from "@/components/site-config-provider";
@@ -102,6 +103,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </AuthProvider>
           </SiteConfigProvider>
         </ThemeProvider>
+        {/* Live chat bubble. Renders nothing outside production builds. */}
+        <CrispChat />
       </body>
     </html>
   );

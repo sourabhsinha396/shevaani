@@ -12,7 +12,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-shevaani}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shevaani}
-      POSTGRES_DB: ${POSTGRES_DB:-shevaani}
+      POSTGRES_DB: ${POSTGRES_DB:-simplepassword}
     # No published ports for safety; the web service can reach it by name on the internal network.
     volumes:
       - pgdata:/var/lib/postgresql/data
