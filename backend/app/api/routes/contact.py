@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy import func, select
 
 from app.api.deps import DbSession, OptionalUser
 from app.api.ratelimit import limiter
 from app.core.ratelimit import CONTACT
-from app.integrations import slack
+from app.integrations import recaptcha, slack
 from app.models.contact import ContactMessage
 from app.schemas.common import Message
 from app.schemas.contact import ContactIn
@@ -36,7 +36,10 @@ MAX_PER_HOUR = 5
     # varies the address. This one is keyed on where the request came from.
     dependencies=[Depends(limiter("contact", CONTACT))],
 )
-async def submit(payload: ContactIn, db: DbSession, user: OptionalUser) -> Message:
+async def submit(
+    payload: ContactIn, request: Request, db: DbSession, user: OptionalUser
+) -> Message:
+    await recaptcha.require(payload.recaptcha_token, request)
     email = payload.email.lower()
     since = utc_now() - timedelta(hours=1)
 

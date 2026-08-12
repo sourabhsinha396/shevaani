@@ -19,7 +19,7 @@ from app.core.security import (
     needs_rehash,
     verify_password,
 )
-from app.integrations import slack
+from app.integrations import recaptcha, slack
 from app.models.enums import CreditReason, UserRole
 from app.models.user import User
 from app.schemas.auth import (
@@ -73,7 +73,10 @@ async def _issue(response: Response, db: AsyncSession, user: User) -> AuthOut:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(limiter("register", REGISTER))],
 )
-async def register(payload: RegisterIn, response: Response, db: DbSession) -> AuthOut:
+async def register(
+    payload: RegisterIn, request: Request, response: Response, db: DbSession
+) -> AuthOut:
+    await recaptcha.require(payload.recaptcha_token, request)
     email = payload.email.lower()
     existing = await db.execute(select(User.id).where(User.email == email))
     if existing.scalar_one_or_none() is not None:
@@ -139,7 +142,10 @@ async def register(payload: RegisterIn, response: Response, db: DbSession) -> Au
     response_model=AuthOut,
     dependencies=[Depends(limiter("login", LOGIN))],
 )
-async def login(payload: LoginIn, response: Response, db: DbSession) -> AuthOut:
+async def login(
+    payload: LoginIn, request: Request, response: Response, db: DbSession
+) -> AuthOut:
+    await recaptcha.require(payload.recaptcha_token, request)
     result = await db.execute(select(User).where(User.email == payload.email.lower()))
     user = result.scalar_one_or_none()
 
@@ -171,6 +177,7 @@ _RESET_REQUESTED = (
     dependencies=[Depends(limiter("forgot-password", FORGOT_PASSWORD))],
 )
 async def forgot_password(payload: ForgotPasswordIn, request: Request, db: DbSession) -> Message:
+    await recaptcha.require(payload.recaptcha_token, request)
     await passwords.request_reset(
         db, payload.email, ip=request.client.host if request.client else None
     )

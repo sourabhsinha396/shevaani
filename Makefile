@@ -1,4 +1,5 @@
-COMPOSE = docker compose -f backend/docker-compose.yaml
+# Base file is production-safe; the dev overlay adds the bind mount + --reload.
+COMPOSE = docker compose -f backend/docker-compose.yaml -f backend/docker-compose.dev.yaml
 
 FRONTEND = npm --prefix frontend
 

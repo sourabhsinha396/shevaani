@@ -36,9 +36,10 @@ _TIMEOUT = httpx.Timeout(30.0, connect=5.0)
 
 
 class FirefliesAPIError(RuntimeError):
-    def __init__(self, message: str, *, retryable: bool = True):
+    def __init__(self, message: str, *, retryable: bool = True, rate_limited: bool = False):
         super().__init__(message)
         self.retryable = retryable
+        self.rate_limited = rate_limited
 
 
 @dataclass(frozen=True)
@@ -69,19 +70,22 @@ async def _graphql(query: str, variables: dict) -> dict:
         )
     if not response.is_success:
         # 4xx other than 429 means the request itself is wrong — retrying won't help.
-        retryable = response.status_code == 429 or response.status_code >= 500
+        rate_limited = response.status_code == 429
         raise FirefliesAPIError(
             f"Fireflies returned {response.status_code}: {response.text[:500]}",
-            retryable=retryable,
+            retryable=rate_limited or response.status_code >= 500,
+            rate_limited=rate_limited,
         )
     payload = response.json()
     if payload.get("errors"):
         # GraphQL errors arrive with HTTP 200. `too_many_requests` is the one
         # worth retrying; everything else is a bad query or a gone resource.
         messages = "; ".join(str(e.get("message", e)) for e in payload["errors"])
+        rate_limited = "too_many_requests" in messages
         raise FirefliesAPIError(
             f"Fireflies GraphQL error: {messages[:500]}",
-            retryable="too_many_requests" in messages,
+            retryable=rate_limited,
+            rate_limited=rate_limited,
         )
     return payload["data"]
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Loader2, MailCheck } from "lucide-react";
 
+import { Recaptcha, recaptchaEnabled, type RecaptchaHandle } from "@/components/recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
@@ -14,19 +15,23 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [captcha, setCaptcha] = React.useState<string | null>(null);
+  const captchaRef = React.useRef<RecaptchaHandle>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await api.forgotPassword(email);
+      await api.forgotPassword(email, captcha ?? undefined);
       // The API answers identically for a registered and an unregistered
       // address, and so does this screen - branching here would hand back the
       // account oracle the endpoint is careful not to be.
       setSent(true);
     } catch (e) {
       setError((e as Error).message);
+      // Tokens are one-time; the failed submit spent this one.
+      captchaRef.current?.reset();
     } finally {
       setBusy(false);
     }
@@ -68,9 +73,16 @@ export default function ForgotPasswordPage() {
                   />
                 </Field>
 
+                <Recaptcha ref={captchaRef} onChange={setCaptcha} />
+
                 {error && <p className="text-destructive text-sm">{error}</p>}
 
-                <Button type="submit" variant="brand" size="lg" disabled={busy}>
+                <Button
+                  type="submit"
+                  variant="brand"
+                  size="lg"
+                  disabled={busy || (recaptchaEnabled && !captcha)}
+                >
                   {busy && <Loader2 className="size-4 animate-spin" />}
                   Send reset link
                 </Button>

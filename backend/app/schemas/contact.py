@@ -13,6 +13,9 @@ class ContactIn(BaseModel):
     email: EmailStr
     subject: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=10, max_length=5000)
+    #: From the v2 checkbox; whether one is required is the route's decision,
+    #: made against ``settings.recaptcha_configured``. See schemas/auth.py.
+    recaptcha_token: str | None = Field(default=None, max_length=4096)
 
 
 class ContactMessageOut(ORMModel):

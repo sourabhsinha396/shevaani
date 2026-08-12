@@ -135,6 +135,12 @@ class Settings(BaseSettings):
     backup_retention_days: int = 30
     backup_hour_utc: int = 18  # 23:30 IST
 
+    #: reCAPTCHA v2 checkbox on login, registration and forgot-password. Unset
+    #: means the check is skipped entirely — the frontend only renders the
+    #: widget when its NEXT_PUBLIC_RECAPTCHA_SITE_KEY is set, so the two must
+    #: be configured (or left empty) together.
+    recaptcha_secret_key: str = ""
+
     # Rate limiting
     rate_limit_enabled: bool = True
     #: Only turn this on when something in front of the app *overwrites*
@@ -180,6 +186,11 @@ class Settings(BaseSettings):
     @property
     def slack_configured(self) -> bool:
         return bool(self.slack_webhook_url)
+
+    @property
+    def recaptcha_configured(self) -> bool:
+        """False skips verification, so local dev needs no Google account."""
+        return bool(self.recaptcha_secret_key)
 
     @property
     def fireflies_configured(self) -> bool:

@@ -13,6 +13,7 @@ import re
 import uuid
 from datetime import timedelta
 
+from sqlalchemy import func as sa_func
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -339,6 +340,14 @@ async def post_slack_message(ctx: dict, text: str) -> str:
 #: would produce feedback about a meeting the learners don't recognise.
 NOTETAKER_WINDOW_MINUTES = 15
 
+#: Fireflies allows 3 ``addToLiveMeeting`` calls per 20 minutes. Counting rows
+#: with a recent ``notetaker_dispatched_at`` reconstructs the rolling window
+#: from data we already keep — no Redis counter to drift out of sync, and it
+#: survives worker restarts. Failed calls are not counted, which is slightly
+#: optimistic; the 429 handler below is the backstop for that.
+FIREFLIES_RATE_LIMIT = 3
+FIREFLIES_RATE_WINDOW_MINUTES = 20
+
 
 async def dispatch_notetakers(ctx: dict) -> str:
     """Send the Fireflies bot into meetings whose session just started.
@@ -353,6 +362,18 @@ async def dispatch_notetakers(ctx: dict) -> str:
 
     now = utc_now()
     async with SessionLocal() as db:
+        recent = await db.scalar(
+            select(sa_func.count())
+            .select_from(SessionMeeting)
+            .where(
+                SessionMeeting.notetaker_dispatched_at
+                > now - timedelta(minutes=FIREFLIES_RATE_WINDOW_MINUTES)
+            )
+        )
+        budget = FIREFLIES_RATE_LIMIT - (recent or 0)
+        if budget <= 0:
+            return "rate window exhausted, 0 sent"
+
         result = await db.execute(
             select(Session)
             .join(SessionMeeting, SessionMeeting.session_id == Session.id)
@@ -364,11 +385,22 @@ async def dispatch_notetakers(ctx: dict) -> str:
                 SessionMeeting.status == MeetingStatus.READY,
                 SessionMeeting.notetaker_dispatched_at.is_(None),
             )
+            # Oldest start first: those sessions fall out of the dispatch
+            # window soonest, so they get the scarce rate-limit slots.
+            .order_by(Session.starts_at)
         )
         sessions = list(result.scalars().all())
 
         sent = 0
         for session in sessions:
+            if sent >= budget:
+                # Remaining sessions wait for the next tick; anything still
+                # inside its 15-minute window gets picked up then.
+                logger.info(
+                    "Notetaker rate budget spent, %d session(s) deferred",
+                    len(sessions) - sent,
+                )
+                break
             meeting = session.meeting
             if not meeting or not meeting.join_url:
                 continue
@@ -380,10 +412,15 @@ async def dispatch_notetakers(ctx: dict) -> str:
                     duration_minutes=duration,
                 )
             except fireflies.FirefliesAPIError as exc:
-                # Rate limit or blip: the next tick retries while the window
-                # is open. Log rather than alert — a session with no
-                # transcript is a degraded extra, not an incident.
                 logger.warning("Notetaker dispatch failed for %s: %s", session.id, exc)
+                if exc.rate_limited:
+                    # Fireflies says the window is spent (our count was
+                    # optimistic — failed calls consume slots too). More
+                    # calls this tick would only burn the next window.
+                    break
+                # Anything else is a blip: the next tick retries while the
+                # session's window is open. Log rather than alert — a session
+                # with no transcript is a degraded extra, not an incident.
                 continue
             if ok:
                 meeting.notetaker_dispatched_at = utc_now()

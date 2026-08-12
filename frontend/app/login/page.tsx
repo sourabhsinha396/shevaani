@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { Recaptcha, recaptchaEnabled, type RecaptchaHandle } from "@/components/recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
@@ -19,16 +20,21 @@ function LoginForm() {
   const [password, setPassword] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [captcha, setCaptcha] = React.useState<string | null>(null);
+  const captchaRef = React.useRef<RecaptchaHandle>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await signIn(email, password);
+      await signIn(email, password, captcha ?? undefined);
       router.push(params.get("next") ?? "/dashboard");
     } catch (e) {
       setError((e as Error).message);
+      // The token went with the failed attempt and is spent either way - a
+      // retry needs a fresh tick, so clear the widget with the error.
+      captchaRef.current?.reset();
     } finally {
       setBusy(false);
     }
@@ -62,9 +68,16 @@ function LoginForm() {
         Forgot your password?
       </Link>
 
+      <Recaptcha ref={captchaRef} onChange={setCaptcha} />
+
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Button type="submit" variant="brand" size="lg" disabled={busy}>
+      <Button
+        type="submit"
+        variant="brand"
+        size="lg"
+        disabled={busy || (recaptchaEnabled && !captcha)}
+      >
         {busy && <Loader2 className="size-4 animate-spin" />}
         Sign in
       </Button>

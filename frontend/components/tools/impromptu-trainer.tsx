@@ -616,6 +616,14 @@ export function ImpromptuTrainer({
                   Topic
                 </Button>
                 <p className="text-muted-foreground text-xs">{settingsSummary}</p>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
+                >
+                  <SlidersHorizontal className="size-3" />
+                  Customize
+                </button>
               </div>
             </div>
           )}

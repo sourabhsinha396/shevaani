@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { Recaptcha, recaptchaEnabled, type RecaptchaHandle } from "@/components/recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
@@ -26,6 +27,8 @@ function RegisterForm() {
   });
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [captcha, setCaptcha] = React.useState<string | null>(null);
+  const captchaRef = React.useRef<RecaptchaHandle>(null);
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -37,6 +40,7 @@ function RegisterForm() {
     try {
       await api.register({
         ...form,
+        recaptcha_token: captcha ?? undefined,
         // Both read off the browser, which knows them better than a dropdown
         // would. The country used to be asked for because it picked the payment
         // provider; the currency does that now, so it is only kept for support
@@ -55,6 +59,8 @@ function RegisterForm() {
       router.push(params.get("next") ?? "/discussions");
     } catch (e) {
       setError((e as Error).message);
+      // Tokens are one-time; the failed submit spent this one.
+      captchaRef.current?.reset();
     } finally {
       setBusy(false);
     }
@@ -88,9 +94,16 @@ function RegisterForm() {
                   autoComplete="new-password"
                 />
               </Field>
+              <Recaptcha ref={captchaRef} onChange={setCaptcha} />
+
               {error && <p className="text-destructive text-sm">{error}</p>}
 
-              <Button type="submit" variant="brand" size="lg" disabled={busy}>
+              <Button
+                type="submit"
+                variant="brand"
+                size="lg"
+                disabled={busy || (recaptchaEnabled && !captcha)}
+              >
                 {busy && <Loader2 className="size-4 animate-spin" />}
                 Create account
               </Button>

@@ -11,6 +11,11 @@ from app.schemas.common import UserOut
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 128
 
+#: What the reCAPTCHA v2 widget put in the form. Optional at the schema level
+#: because the whole feature is optional — whether one is *required* is decided
+#: in the route against ``settings.recaptcha_configured``, not here.
+_RECAPTCHA_FIELD = Field(default=None, max_length=4096)
+
 
 class RegisterIn(BaseModel):
     email: EmailStr
@@ -25,6 +30,7 @@ class RegisterIn(BaseModel):
     #: only — an unknown or mangled code is ignored, never an error, because a
     #: typo in somebody's WhatsApp message must not block a registration.
     referral_code: str | None = Field(default=None, max_length=32)
+    recaptcha_token: str | None = _RECAPTCHA_FIELD
 
     @field_validator("timezone")
     @classmethod
@@ -46,6 +52,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    recaptcha_token: str | None = _RECAPTCHA_FIELD
 
 
 class AuthOut(BaseModel):
@@ -58,6 +65,7 @@ class AuthOut(BaseModel):
 
 class ForgotPasswordIn(BaseModel):
     email: EmailStr
+    recaptcha_token: str | None = _RECAPTCHA_FIELD
 
 
 class ResetPasswordIn(BaseModel):

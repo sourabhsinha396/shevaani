@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { Recaptcha, recaptchaEnabled, type RecaptchaHandle } from "@/components/recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Textarea } from "@/components/ui/input";
@@ -28,6 +29,8 @@ export default function ContactPage() {
     subject: "",
     body: "",
   });
+  const [captcha, setCaptcha] = React.useState<string | null>(null);
+  const captchaRef = React.useRef<RecaptchaHandle>(null);
 
   // The auth state resolves after the first paint, so fill in once it arrives -
   // without clobbering anything already typed.
@@ -49,10 +52,12 @@ export default function ContactPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.contact(form);
+      await api.contact({ ...form, recaptcha_token: captcha ?? undefined });
       setSent(true);
     } catch (e) {
       setError((e as Error).message);
+      // Tokens are one-time; the failed submit spent this one.
+      captchaRef.current?.reset();
     } finally {
       setBusy(false);
     }
@@ -130,10 +135,16 @@ export default function ContactPage() {
                 />
               </Field>
 
+              <Recaptcha ref={captchaRef} onChange={setCaptcha} />
+
               {error && <p className="text-destructive text-sm">{error}</p>}
 
               <div>
-                <Button type="submit" variant="brand" disabled={busy}>
+                <Button
+                  type="submit"
+                  variant="brand"
+                  disabled={busy || (recaptchaEnabled && !captcha)}
+                >
                   {busy && <Loader2 className="size-4 animate-spin" />}
                   Send message
                 </Button>

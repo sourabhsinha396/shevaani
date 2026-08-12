@@ -18,4 +18,8 @@ export const config = {
     "",
   ),
   isProduction: process.env.NODE_ENV === "production",
+  /** reCAPTCHA v2 checkbox site key. Empty means the widget is not rendered
+   *  and the auth forms submit without a token - the backend skips the check
+   *  too when its RECAPTCHA_SECRET_KEY is unset. Set both or neither. */
+  recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "",
 };

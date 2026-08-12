@@ -11,7 +11,11 @@ interface AuthState {
   loading: boolean;
   credits: number;
   refresh: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (
+    email: string,
+    password: string,
+    recaptchaToken?: string,
+  ) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -46,8 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const signIn = React.useCallback(
-    async (email: string, password: string) => {
-      await api.login({ email, password });
+    async (email: string, password: string, recaptchaToken?: string) => {
+      await api.login({ email, password, recaptcha_token: recaptchaToken });
       await refresh();
     },
     [refresh],

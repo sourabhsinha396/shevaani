@@ -94,13 +94,16 @@ export const api = {
     /** The `?r=` code the visit carried, if any. Attribution only - an unknown
      *  code is ignored server-side, never an error. */
     referral_code?: string;
+    /** From the v2 checkbox. Required by the server exactly when it has a
+     *  secret configured; omitted when the widget is not rendered. */
+    recaptcha_token?: string;
   }) =>
     request<{ user: User; access_token: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
 
-  login: (payload: { email: string; password: string }) =>
+  login: (payload: { email: string; password: string; recaptcha_token?: string }) =>
     request<{ user: User; access_token: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -111,10 +114,10 @@ export const api = {
   me: () => request<User>("/auth/me"),
 
   /** Always resolves with the same message, registered address or not. */
-  forgotPassword: (email: string) =>
+  forgotPassword: (email: string, recaptcha_token?: string) =>
     request<{ detail: string }>("/auth/forgot-password", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, recaptcha_token }),
     }),
 
   /** Signs the browser in on success - the mailbox has just been proven. */
@@ -283,6 +286,7 @@ export const api = {
     email: string;
     subject: string;
     body: string;
+    recaptcha_token?: string;
   }) =>
     request<{ detail: string }>("/contact", {
       method: "POST",

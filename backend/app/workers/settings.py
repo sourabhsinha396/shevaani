@@ -64,8 +64,9 @@ class WorkerSettings:
     ]
 
     cron_jobs = [
-        # Under-filled sessions must be cancelled well before they start.
-        cron(auto_cancel_underfilled_sessions, minute={0, 15, 30, 45}),
+        # auto_cancel_underfilled_sessions is deliberately NOT scheduled:
+        # under-filled sessions are cancelled manually for now. It stays in
+        # `functions` above so it can still be enqueued by hand.
         cron(sweep_expired_holds, minute={5, 35}),
         cron(retry_pending_meetings, minute={10, 40}),
         cron(mark_sessions_completed, minute={20, 50}),

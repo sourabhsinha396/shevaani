@@ -57,8 +57,8 @@ export default function DiscussionsPage() {
         <div>
           <h1 className="text-3xl tracking-tight sm:text-4xl">Group discussions</h1>
           <p className="text-muted-foreground mt-2 max-w-lg text-pretty">
-            Four to eight people, one instructor, forty-five minutes of actual
-            speaking. Pick a topic and a time that suit you.
+            Four to eight people, one instructor, thirty minutes of actual
+            speaking.
           </p>
         </div>
 {/* 

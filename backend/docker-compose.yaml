@@ -1,66 +1,64 @@
 name: shevaani
 
+# Production-safe base. Compose interpolates ${...} from the .env file sitting
+# next to this file, so POSTGRES_* live there alongside the app's own settings.
+# Dev conveniences (bind mount, --reload) are layered on by docker-compose.dev.yaml,
+# which the Makefile adds automatically. On the server, run this file alone:
+#   docker compose -f docker-compose.yaml up -d --build
+
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: shevaani
-      POSTGRES_PASSWORD: shevaani
-      POSTGRES_DB: shevaani
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-shevaani}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shevaani}
+      POSTGRES_DB: ${POSTGRES_DB:-shevaani}
+    # No published ports for safety; the web service can reach it by name on the internal network.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shevaani -d shevaani"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # No published ports for safety
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   web:
     build: .
     env_file: .env
-    environment:
-      # Inside the network these resolve to the service names, not localhost.
-      DATABASE_URL: postgresql+asyncpg://shevaani:shevaani@db:5432/shevaani
-      REDIS_URL: redis://redis:6379/0
     ports:
-      - "8000:8000"
+      # Host side is per-deployment (several products share the server, each
+      # takes its own localhost port); container side stays 8000 everywhere.
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      # Bind-mount for hot reload. Drop this in production.
-      - .:/app
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
 
   worker:
     build: .
     env_file: .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://shevaani:shevaani@db:5432/shevaani
-      REDIS_URL: redis://redis:6379/0
     depends_on:
       # Waits for `web` so migrations have run before jobs touch the tables.
       web:
         condition: service_started
-    volumes:
-      - .:/app
     command: arq app.workers.settings.WorkerSettings
+    restart: unless-stopped
 
 # The Next.js frontend is not containerised — run it natively:
 #   cd ../frontend && npm run dev
