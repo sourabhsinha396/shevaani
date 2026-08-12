@@ -71,6 +71,24 @@ class CreditBalanceOut(BaseModel):
     balance: int
 
 
+class CreditAdjustByEmailIn(CreditAdjustIn):
+    """The same signed adjustment, addressed by email instead of id — for the
+    credits screen, where support has an address and not a UUID."""
+
+    email: str = Field(min_length=3, max_length=320)
+
+
+class CreditAdjustByEmailOut(BaseModel):
+    """Echoes who was credited, so the screen can confirm it hit the right
+    account before the admin closes the tab."""
+
+    user_id: uuid.UUID
+    full_name: str
+    email: str
+    role: str
+    balance: int
+
+
 class InstructorAdminOut(BaseModel):
     id: uuid.UUID
     full_name: str

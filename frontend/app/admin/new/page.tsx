@@ -84,16 +84,23 @@ export default function NewSessionPage() {
     setQuickBusy(true);
     setError(null);
     try {
+      const startsAt = new Date(Date.now() + 5 * 60_000);
+      // The date-time in the title keeps every test's slug distinct on its own,
+      // and tells the tests apart in the session list.
+      const stamp = startsAt.toLocaleString(undefined, {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
       const created = await api.adminCreateSession({
         instructor_id: host.id,
-        title: "Quick test discussion",
-        // The server derives the slug from the title and appends -2, -3… on
-        // repeat clicks, so every test gets its own URL.
+        title: `Quick test ${stamp}`,
         slug: null,
         topic: "Test - ignore",
         description: null,
         prep_material_url: null,
-        starts_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+        starts_at: startsAt.toISOString(),
         duration_minutes: 15, // the shortest the API allows
         min_seats: 1, // never auto-cancels for want of bookings
         max_seats: 6,

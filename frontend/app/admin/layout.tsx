@@ -23,6 +23,7 @@ const SUPERUSER_TABS = [
   { href: "/admin/feedback", label: "Feedback" },
   { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/learners", label: "Learners" },
+  { href: "/admin/credits", label: "Credits" },
   { href: "/admin/instructors", label: "Instructors" },
   { href: "/admin/messages", label: "Messages" },
   { href: "/admin/impromptu", label: "Impromptu" },

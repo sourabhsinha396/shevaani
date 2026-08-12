@@ -9,7 +9,6 @@ at Google degrades the admin view instead of breaking bookings.
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 from datetime import timedelta
 
@@ -226,6 +225,27 @@ async def remove_session_meeting(ctx: dict, session_id: str) -> str:
         return "removed"
 
 
+async def delete_calendar_event(ctx: dict, instructor_id: str, event_id: str) -> str:
+    """Delete a Calendar event whose session row is already gone.
+
+    ``remove_session_meeting`` finds the event through the session; a
+    hard-deleted session no longer has a row to look through, so the ids travel
+    with the job instead. There is nowhere left to record a failure — a
+    retryable error re-raises so arq retries it, anything else is logged and
+    dropped.
+    """
+    async with SessionLocal() as db:
+        try:
+            access_token, _ = await _access_token_for(db, uuid.UUID(instructor_id))
+            await google_calendar.delete_event(access_token, event_id=event_id)
+        except GoogleAPIError as exc:
+            if exc.retryable:
+                raise
+            logger.warning("Orphaned calendar event %s could not be deleted: %s", event_id, exc)
+            return f"failed: {exc}"
+    return "removed"
+
+
 async def retry_pending_meetings(ctx: dict) -> str:
     """Safety net for sessions whose meeting job died without leaving a retry."""
     async with SessionLocal() as db:
@@ -429,9 +449,6 @@ async def dispatch_notetakers(ctx: dict) -> str:
     return f"dispatched {sent}/{len(sessions)}"
 
 
-_MEET_CODE = re.compile(r"meet\.google\.com/([a-z0-9-]+)", re.IGNORECASE)
-
-
 async def ingest_fireflies_transcript(ctx: dict, provider_transcript_id: str) -> str:
     """Fetch a finished transcript, attach it to its session, resolve speakers.
 
@@ -444,7 +461,7 @@ async def ingest_fireflies_transcript(ctx: dict, provider_transcript_id: str) ->
         return "not configured"
 
     transcript_data = await fireflies.fetch_transcript(provider_transcript_id)
-    code_match = _MEET_CODE.search(transcript_data.meeting_link or "")
+    code_match = transcript_service.MEET_CODE.search(transcript_data.meeting_link or "")
     if code_match is None:
         return "no meet link"
 

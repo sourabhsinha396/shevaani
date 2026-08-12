@@ -125,6 +125,7 @@ export interface AdminSession extends DiscussionSession {
   meeting_status: MeetingStatus | null;
   meeting_last_error: string | null;
   meeting_host_email: string | null;
+  meeting_join_url: string | null;
   waitlist_count: number;
 }
 

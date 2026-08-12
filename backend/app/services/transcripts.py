@@ -37,6 +37,11 @@ from app.models.session import Session
 from app.models.user import User
 from app.services.scheduling import utc_now
 
+#: A Google Meet code inside any URL — the join key that ties a Fireflies
+#: transcript back to its ``session_meetings`` row. Used by the webhook-driven
+#: ingest job and the admin "fetch transcript" endpoint alike.
+MEET_CODE = re.compile(r"meet\.google\.com/([a-z0-9-]+)", re.IGNORECASE)
+
 #: Confident enough to assign without a human.
 AUTO_THRESHOLD = 0.80
 #: A label whose best and second-best candidates are closer than this is

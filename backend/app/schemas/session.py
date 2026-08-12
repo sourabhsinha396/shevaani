@@ -55,6 +55,9 @@ class SessionAdminOut(SessionOut):
     meeting_status: MeetingStatus | None = None
     meeting_last_error: str | None = None
     meeting_host_email: str | None = None
+    #: The Meet link itself. Learners get it gated through GET /sessions/{id}/join;
+    #: superusers see it here so they can hand it to the instructor.
+    meeting_join_url: str | None = None
     waitlist_count: int = 0
 
 

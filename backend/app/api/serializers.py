@@ -207,6 +207,7 @@ def build_session_admin_out(
         meeting_status=meeting.status if meeting else None,
         meeting_last_error=meeting.last_error if meeting else None,
         meeting_host_email=meeting.host_google_email if meeting else None,
+        meeting_join_url=meeting.join_url if meeting else None,
         waitlist_count=waitlisted,
     )
 

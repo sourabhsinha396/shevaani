@@ -257,7 +257,8 @@ class SessionMeeting(Base, UUIDPrimaryKey, Timestamped):
     calendar_event_id: Mapped[str | None] = mapped_column(String(1024))
     #: The account whose calendar holds the event — i.e. the Meet host.
     host_google_email: Mapped[str | None] = mapped_column(String(320))
-    #: Bearer credential. Never serialise this outside GET /sessions/{id}/join.
+    #: Bearer credential. Never serialise this outside GET /sessions/{id}/join
+    #: and the superuser-only ``SessionAdminOut``.
     join_url: Mapped[str | None] = mapped_column(Text)
 
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

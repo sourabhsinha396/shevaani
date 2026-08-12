@@ -346,6 +346,9 @@ export const api = {
   adminPublish: (id: string) =>
     request<AdminSession>(`/admin/sessions/${id}/publish`, { method: "POST" }),
 
+  adminDeleteSession: (id: string) =>
+    request<{ detail: string }>(`/admin/sessions/${id}`, { method: "DELETE" }),
+
   adminCancel: (id: string, reason: string) =>
     request<AdminSession>(`/admin/sessions/${id}/cancel`, {
       method: "POST",
@@ -354,6 +357,14 @@ export const api = {
 
   adminRetryMeeting: (id: string) =>
     request<{ detail: string }>(`/admin/sessions/${id}/retry-meeting`, { method: "POST" }),
+
+  /** Send the Fireflies bot into the Meet now, without waiting for the dispatch cron. */
+  adminInviteNotetaker: (id: string) =>
+    request<{ detail: string }>(`/admin/sessions/${id}/invite-notetaker`, { method: "POST" }),
+
+  /** Match & ingest the Fireflies transcript — for local dev, where the webhook can't reach us. */
+  adminFetchTranscript: (id: string) =>
+    request<{ detail: string }>(`/admin/sessions/${id}/fetch-transcript`, { method: "POST" }),
 
   adminRoster: (id: string) => request<Roster>(`/admin/sessions/${id}/roster`),
 
@@ -394,6 +405,19 @@ export const api = {
     request<{ balance: number }>(`/admin/learners/${id}/credits`, {
       method: "POST",
       body: JSON.stringify({ delta, note }),
+    }),
+
+  /** Same adjustment addressed by email, and not limited to learners. */
+  adminAdjustCreditsByEmail: (email: string, delta: number, note?: string) =>
+    request<{
+      user_id: string;
+      full_name: string;
+      email: string;
+      role: string;
+      balance: number;
+    }>(`/admin/credits`, {
+      method: "POST",
+      body: JSON.stringify({ email, delta, note }),
     }),
 
   /** Read fresh, not through the ISR cache the rest of the site sees - a

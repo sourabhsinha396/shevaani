@@ -7,7 +7,7 @@ security.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
@@ -22,6 +22,8 @@ from app.api.serializers import (
     waitlist_counts,
 )
 from app.api.serializers import session_roster as roster_for
+from app.core.config import settings
+from app.integrations import fireflies
 from app.models.billing import CreditLedger
 from app.models.booking import Booking
 from app.models.contact import ContactMessage
@@ -38,6 +40,8 @@ from app.schemas.admin import (
     AnalyticsOut,
     CancellationImpactOut,
     ContactHandledIn,
+    CreditAdjustByEmailIn,
+    CreditAdjustByEmailOut,
     CreditAdjustIn,
     CreditBalanceOut,
     InstructorAdminIn,
@@ -62,6 +66,7 @@ from app.services import booking as booking_service
 from app.services import credits, session_admin, site_settings
 from app.services.errors import Conflict, NotFound
 from app.services.scheduling import utc_now
+from app.services.transcripts import MEET_CODE
 from app.workers import queue
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -224,6 +229,26 @@ async def cancel_session(
     return await _serialize(db, await _load(db, session_id))
 
 
+@router.delete("/sessions/{session_id}", response_model=Message)
+async def delete_session(session_id: uuid.UUID, db: DbSession, _: Superuser) -> Message:
+    """Hard-delete a session — for drafts, test rows and cancelled sessions.
+
+    Refused while any booking is live or is attendance history; cancel first for
+    the former, sqladmin for the latter. The Calendar event's ids are captured
+    before the row goes, because the cleanup job can no longer look them up.
+    """
+    session = await _load(db, session_id)
+    instructor_id = session.instructor_id
+    event_id = session.meeting.calendar_event_id if session.meeting else None
+
+    await session_admin.delete_group_session(db, session)
+    await db.commit()
+
+    if event_id:
+        await queue.enqueue("delete_calendar_event", str(instructor_id), event_id)
+    return Message(detail="Session deleted.")
+
+
 @router.post("/sessions/{session_id}/retry-meeting", response_model=Message)
 async def retry_meeting(session_id: uuid.UUID, db: DbSession, _: Superuser) -> Message:
     """Re-run the Meet creation for a session whose meeting failed.
@@ -238,6 +263,86 @@ async def retry_meeting(session_id: uuid.UUID, db: DbSession, _: Superuser) -> M
     await db.commit()
     await queue.enqueue("sync_session_meeting", str(session_id))
     return Message(detail="Retrying — refresh in a few seconds.")
+
+
+@router.post("/sessions/{session_id}/invite-notetaker", response_model=Message)
+async def invite_notetaker(session_id: uuid.UUID, db: DbSession, _: Superuser) -> Message:
+    """Send the Fireflies bot into this session's Meet right now.
+
+    The dispatch cron does the same on a clock, but only inside the first
+    15 minutes after start and only from a running worker. The button covers
+    everything else: local dev without the worker, a bot that got kicked, a
+    meeting that started late. Stamping ``notetaker_dispatched_at`` keeps the
+    cron from sending a second bot after us.
+    """
+    if not settings.fireflies_configured:
+        raise Conflict("Fireflies is not configured (FIREFLIES_API_KEY).")
+
+    session = await _load(db, session_id)
+    meeting = session.meeting
+    if meeting is None or not meeting.join_url:
+        raise Conflict("This session has no Meet link for the bot to join.")
+
+    duration = int((session.ends_at - session.starts_at).total_seconds() // 60)
+    try:
+        ok = await fireflies.add_to_live_meeting(
+            meeting_link=meeting.join_url,
+            title=session.title,
+            duration_minutes=duration,
+        )
+    except fireflies.FirefliesAPIError as exc:
+        raise Conflict(f"Fireflies: {exc}") from exc
+    if not ok:
+        raise Conflict(
+            "Fireflies declined the invite — the bot can only join a meeting "
+            "that is live, so make sure someone is in the room."
+        )
+
+    meeting.notetaker_dispatched_at = utc_now()
+    await db.commit()
+    return Message(detail="Bot invited — admit it from the Meet lobby.")
+
+
+@router.post("/sessions/{session_id}/fetch-transcript", response_model=Message)
+async def fetch_transcript(session_id: uuid.UUID, db: DbSession, _: Superuser) -> Message:
+    """Pull this session's Fireflies transcript without waiting for the webhook.
+
+    Production learns about transcripts from ``meeting.transcribed``; a local
+    backend has no public URL for Fireflies to call, so nothing would ever
+    arrive. This asks Fireflies for transcripts created around the session,
+    matches by Meet code, and hands the id to the same ingest job the webhook
+    would have enqueued — one pipeline, two doorbells.
+    """
+    if not settings.fireflies_configured:
+        raise Conflict("Fireflies is not configured (FIREFLIES_API_KEY).")
+
+    session = await _load(db, session_id)
+    join_url = (session.meeting.join_url if session.meeting else None) or ""
+    code_match = MEET_CODE.search(join_url)
+    if code_match is None:
+        raise Conflict("This session has no Meet link to match a transcript against.")
+
+    try:
+        recent = await fireflies.list_transcripts_since(
+            # An hour of slack: the bot may join late, and Fireflies stamps
+            # the transcript with its own notion of when the meeting was.
+            session.starts_at - timedelta(hours=1)
+        )
+    except fireflies.FirefliesAPIError as exc:
+        raise Conflict(f"Fireflies: {exc}") from exc
+
+    code = code_match.group(1).lower()
+    found = next((t for t in recent if code in (t.meeting_link or "").lower()), None)
+    if found is None:
+        # Conflict, not NotFound: a 404 here would be indistinguishable from
+        # "this route/session doesn't exist" in the network tab.
+        raise Conflict(
+            "Fireflies has no transcript for this Meet yet — transcription usually "
+            "lands a few minutes after the call ends. Try again shortly."
+        )
+
+    await queue.enqueue("ingest_fireflies_transcript", found.id)
+    return Message(detail="Transcript found — ingesting now. Refresh in a few seconds.")
 
 
 @router.get("/sessions/{session_id}/roster")
@@ -364,32 +469,63 @@ async def learner_detail(
     )
 
 
+async def _apply_credit_adjustment(
+    db: DbSession, user: User, *, delta: int, note: str | None, actor: User
+) -> int:
+    """Both directions are ledger rows; nothing is ever edited in place, so the
+    balance stays reconstructible from history."""
+    await credits.lock_user(db, user.id)
+    note = note or f"Adjusted by {actor.email}"
+
+    if delta > 0:
+        await credits.grant(db, user.id, delta, CreditReason.ADMIN_GRANT, note=note)
+    else:
+        # spend() refuses to go negative — a balance below zero would be a bug
+        # the ledger could never explain.
+        await credits.spend(db, user.id, -delta, CreditReason.ADMIN_REVOKE, note=note)
+
+    return await credits.balance(db, user.id)
+
+
 @router.post("/learners/{learner_id}/credits", response_model=CreditBalanceOut)
 async def adjust_credits(
     learner_id: uuid.UUID, payload: CreditAdjustIn, db: DbSession, actor: Superuser
 ) -> CreditBalanceOut:
-    """Hand-grant or claw back credits — what `make credits` does, from the UI.
-
-    Both directions are ledger rows; nothing is ever edited in place, so the
-    balance stays reconstructible from history.
-    """
+    """Hand-grant or claw back credits — what `make credits` does, from the UI."""
     user = await db.get(User, learner_id)
     if user is None:
         raise NotFound("Learner not found.")
 
-    await credits.lock_user(db, user.id)
-    note = payload.note or f"Adjusted by {actor.email}"
+    balance = await _apply_credit_adjustment(
+        db, user, delta=payload.delta, note=payload.note, actor=actor
+    )
+    return CreditBalanceOut(balance=balance)
 
-    if payload.delta > 0:
-        await credits.grant(db, user.id, payload.delta, CreditReason.ADMIN_GRANT, note=note)
-    else:
-        # spend() refuses to go negative — a balance below zero would be a bug
-        # the ledger could never explain.
-        await credits.spend(
-            db, user.id, -payload.delta, CreditReason.ADMIN_REVOKE, note=note
-        )
 
-    return CreditBalanceOut(balance=await credits.balance(db, user.id))
+@router.post("/credits", response_model=CreditAdjustByEmailOut)
+async def adjust_credits_by_email(
+    payload: CreditAdjustByEmailIn, db: DbSession, actor: Superuser
+) -> CreditAdjustByEmailOut:
+    """The same adjustment, addressed by email — and for *any* role, where the
+    learner search shows only learners. This is how a superuser or instructor
+    account gets test credits without SQL."""
+    result = await db.execute(
+        select(User).where(func.lower(User.email) == payload.email.strip().lower())
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise NotFound(f"No account uses {payload.email.strip()}.")
+
+    balance = await _apply_credit_adjustment(
+        db, user, delta=payload.delta, note=payload.note, actor=actor
+    )
+    return CreditAdjustByEmailOut(
+        user_id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        role=user.role.value,
+        balance=balance,
+    )
 
 
 # --------------------------------------------------------------- instructors

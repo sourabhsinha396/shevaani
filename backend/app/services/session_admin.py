@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from sqlalchemy import func as sa_func
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -231,6 +232,41 @@ async def publish_session(db: AsyncSession, session: Session) -> Session:
     session.status = SessionStatus.PUBLISHED
     await db.flush()
     return session
+
+
+async def delete_group_session(db: AsyncSession, session: Session) -> None:
+    """Hard-delete a session row and everything hanging off it.
+
+    For the sessions this is meant for — drafts, test rows, cancelled sessions —
+    the cascades take the meeting, cancelled bookings, transcript and reminders
+    with it, and the engagement trigger frees the instructor's hour.
+
+    Refuses while any booking is not CANCELLED. Live seats and waitlist spots
+    are learners still expecting something, and deleting the row would eat their
+    credits with no refund; attended/no-show bookings are history that the
+    learner's record and the ledger lean on. sqladmin remains the escape hatch
+    for deleting history on purpose.
+    """
+    result = await db.execute(
+        select(sa_func.count(Booking.id)).where(
+            Booking.session_id == session.id,
+            Booking.status != BookingStatus.CANCELLED,
+        )
+    )
+    live = result.scalar_one()
+    if live:
+        if session.starts_at < utc_now():
+            raise Conflict(
+                f"This session already ran and {live} booking(s) on it are attendance "
+                f"history. Deleting that is a database-admin job, not a button."
+            )
+        raise Conflict(
+            f"{live} learner(s) hold a seat or waitlist spot. Cancel the session "
+            f"first — that refunds them — then delete it."
+        )
+
+    await db.delete(session)
+    await db.flush()
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.workers.jobs import (
     auto_cancel_underfilled_sessions,
     backup_database,
+    delete_calendar_event,
     dispatch_notetakers,
     finalize_session_feedback,
     generate_session_feedback,
@@ -45,6 +46,7 @@ class WorkerSettings:
     functions = [
         sync_session_meeting,
         remove_session_meeting,
+        delete_calendar_event,
         retry_pending_meetings,
         sweep_expired_holds,
         auto_cancel_underfilled_sessions,

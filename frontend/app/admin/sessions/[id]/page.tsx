@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Bot, FileText, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import { CancelSessionDialog } from "@/components/admin/cancel-session-dialog";
 import { MeetingBadge } from "@/components/admin/meeting-badge";
@@ -26,6 +26,7 @@ function toLocalInput(iso: string) {
 
 export default function AdminSessionPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
 
   const [session, setSession] = React.useState<AdminSession | null>(null);
   const [roster, setRoster] = React.useState<Roster | null>(null);
@@ -34,6 +35,7 @@ export default function AdminSessionPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const [details, setDetails] = React.useState({
     title: "",
@@ -77,6 +79,20 @@ export default function AdminSessionPage() {
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  /** For actions whose success message comes from the backend — show it verbatim. */
+  async function runDetail(action: () => Promise<{ detail: string }>) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      setNotice((await action()).detail);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(action: () => Promise<unknown>, message: string) {
     setBusy(true);
@@ -125,6 +141,16 @@ export default function AdminSessionPage() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Badge variant="outline">{session.status}</Badge>
           <MeetingBadge status={session.meeting_status} error={session.meeting_last_error} />
+          {session.meeting_join_url && (
+            <a
+              href={session.meeting_join_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs underline underline-offset-2 hover:text-foreground"
+            >
+              {session.meeting_join_url.replace(/^https?:\/\//, "")}
+            </a>
+          )}
           {session.meeting_host_email && (
             <span className="text-muted-foreground text-xs">
               hosted on {session.meeting_host_email}
@@ -164,11 +190,39 @@ export default function AdminSessionPage() {
             <RefreshCw className="size-4" /> Retry Meet
           </Button>
         )}
+        {!cancelled && session.meeting_join_url && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void runDetail(() => api.adminInviteNotetaker(session.id))}
+            >
+              <Bot className="size-4" /> Invite notetaker
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void runDetail(() => api.adminFetchTranscript(session.id))}
+            >
+              <FileText className="size-4" /> Fetch transcript
+            </Button>
+          </>
+        )}
         {!cancelled && (
           <Button size="sm" variant="ghost" onClick={() => setCancelling((v) => !v)}>
             Cancel session
           </Button>
         )}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-destructive"
+          onClick={() => setDeleting((v) => !v)}
+        >
+          <Trash2 className="size-4" /> Delete
+        </Button>
       </div>
 
       {cancelling && (
@@ -178,6 +232,45 @@ export default function AdminSessionPage() {
           onCancelled={load}
           onClose={() => setCancelling(false)}
         />
+      )}
+
+      {deleting && (
+        <Card className="border-destructive/40">
+          <CardContent className="flex flex-col gap-4">
+            <div className="text-sm">
+              <p className="font-medium">Delete “{session.title}” for good?</p>
+              <p className="text-muted-foreground mt-1 text-pretty">
+                This removes the session, its Meet link and its calendar event
+                permanently — there is no undo. If learners hold seats it will be
+                refused: cancel the session first so they are refunded.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    await api.adminDeleteSession(session.id);
+                    router.push("/admin");
+                  } catch (e) {
+                    setError((e as Error).message);
+                    setBusy(false);
+                  }
+                }}
+              >
+                {busy && <Loader2 className="size-4 animate-spin" />}
+                Delete permanently
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setDeleting(false)}>
+                Keep it
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Card>

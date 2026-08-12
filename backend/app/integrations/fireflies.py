@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from dataclasses import dataclass
+from datetime import datetime
 
 import httpx
 
@@ -111,6 +112,47 @@ async def add_to_live_meeting(*, meeting_link: str, title: str, duration_minutes
         },
     )
     return bool((data.get("addToLiveMeeting") or {}).get("success"))
+
+
+@dataclass(frozen=True)
+class TranscriptSummary:
+    """Just enough of a transcript to decide whether it is ours."""
+
+    id: str
+    title: str | None
+    meeting_link: str | None
+
+
+async def list_transcripts_since(
+    from_date: datetime, *, limit: int = 50
+) -> list[TranscriptSummary]:
+    """Recent transcripts on the platform account, for webhook-less matching.
+
+    Production learns about transcripts from the ``meeting.transcribed``
+    webhook; a local backend has no public URL for Fireflies to call. This
+    lists what the account has so the caller can match by Meet code instead.
+    """
+    data = await _graphql(
+        """
+        query Transcripts($fromDate: DateTime, $limit: Int) {
+          transcripts(fromDate: $fromDate, limit: $limit) {
+            id
+            title
+            meeting_link
+          }
+        }
+        """,
+        # Their documented per-query maximum is 50.
+        {"fromDate": from_date.isoformat(), "limit": max(1, min(50, limit))},
+    )
+    return [
+        TranscriptSummary(
+            id=raw["id"],
+            title=raw.get("title"),
+            meeting_link=raw.get("meeting_link"),
+        )
+        for raw in (data.get("transcripts") or [])
+    ]
 
 
 async def fetch_transcript(transcript_id: str) -> Transcript:
