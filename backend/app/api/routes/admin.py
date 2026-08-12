@@ -23,7 +23,7 @@ from app.api.serializers import (
 )
 from app.api.serializers import session_roster as roster_for
 from app.core.config import settings
-from app.integrations import fireflies
+from app.integrations import fireflies, slack
 from app.models.billing import CreditLedger
 from app.models.booking import Booking
 from app.models.contact import ContactMessage
@@ -231,7 +231,7 @@ async def cancel_session(
 
 @router.delete("/sessions/{session_id}", response_model=Message)
 async def delete_session(
-    session_id: uuid.UUID, db: DbSession, _: Superuser, force: bool = False
+    session_id: uuid.UUID, db: DbSession, admin: Superuser, force: bool = False
 ) -> Message:
     """Hard-delete a session — for drafts, test rows and cancelled sessions.
 
@@ -243,12 +243,22 @@ async def delete_session(
     session = await _load(db, session_id)
     instructor_id = session.instructor_id
     event_id = session.meeting.calendar_event_id if session.meeting else None
+    # The Slack line outlives the row, so its ingredients are read first.
+    title, starts_at = session.title, session.starts_at
 
-    await session_admin.delete_group_session(db, session, force=force)
+    refunded = await session_admin.delete_group_session(db, session, force=force)
     await db.commit()
 
     if event_id:
         await queue.enqueue("delete_calendar_event", str(instructor_id), event_id)
+    await slack.dispatch(
+        slack.session_deleted(
+            title=title,
+            when=starts_at,
+            deleted_by=admin.full_name,
+            learners_refunded=refunded,
+        )
+    )
     return Message(detail="Session deleted.")
 
 

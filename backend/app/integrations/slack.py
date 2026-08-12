@@ -24,6 +24,7 @@ row: a session title, a payment amount, a user id. Not an inbox, not a link.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 import httpx
 
@@ -104,6 +105,21 @@ def session_auto_cancelled(*, title: str, seats_taken: int, min_seats: int, lear
     return (
         f":no_entry_sign: Auto-cancelled *{title}* — {seats_taken} of {min_seats} seats. "
         f"{learners} learner(s) refunded and notified."
+    )
+
+
+def session_deleted(*, title: str, when: datetime, deleted_by: str, learners_refunded: int) -> str:
+    """A superuser hard-deleted a session. Rare and irreversible, so worth a
+    line even when nobody was booked — the refund tail is what distinguishes a
+    swept test row from pulling a session out from under learners."""
+    tail = (
+        f" {learners_refunded} learner(s) refunded and notified."
+        if learners_refunded
+        else " Nobody was booked."
+    )
+    return (
+        f":wastebasket: *{deleted_by}* deleted *{title}* "
+        f"({when.astimezone(settings.tz):%d %b %H:%M}).{tail}"
     )
 
 

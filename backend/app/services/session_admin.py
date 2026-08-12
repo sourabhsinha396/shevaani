@@ -236,8 +236,9 @@ async def publish_session(db: AsyncSession, session: Session) -> Session:
 
 async def delete_group_session(
     db: AsyncSession, session: Session, *, force: bool = False
-) -> None:
-    """Hard-delete a session row and everything hanging off it.
+) -> int:
+    """Hard-delete a session row and everything hanging off it. Returns how
+    many bookings the ``force`` path cancelled and refunded (0 otherwise).
 
     For the sessions this is meant for — drafts, test rows, cancelled sessions —
     the cascades take the meeting, cancelled bookings, transcript and reminders
@@ -259,18 +260,21 @@ async def delete_group_session(
         )
     )
     live = result.scalar_one()
+    refunded = 0
     if live and session.starts_at >= utc_now():
         if not force:
             raise Conflict(
                 f"{live} learner(s) hold a seat or waitlist spot. Cancel the session "
                 f"first — that refunds them — then delete it."
             )
-        await booking_service.cancel_session(
+        affected = await booking_service.cancel_session(
             db, session, reason="The session was taken off the schedule."
         )
+        refunded = len(affected)
 
     await db.delete(session)
     await db.flush()
+    return refunded
 
 
 @dataclass(frozen=True)
